@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="HEpARS" name="SoundImagine" projectType="audioplug" useAppConfig="0"
-              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1">
+              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginFormats="buildAU,buildLV2,buildStandalone,buildVST3"
+              version="1.0.0" companyName="TechProject" companyWebsite="github.com/398noe"
+              pluginManufacturerCode="Nyao" pluginCode="Imag" pluginVST3Category="Analyzer"
+              pluginVSTCategory="kPlugCategAnalysis">
   <MAINGROUP id="RzupNr" name="SoundImagine">
     <GROUP id="{C4611D10-19CB-3CED-E3F2-C0147A4ABA25}" name="Source">
       <FILE id="Zfjx9u" name="PluginProcessor.cpp" compile="1" resource="0"

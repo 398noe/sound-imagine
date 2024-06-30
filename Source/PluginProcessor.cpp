@@ -19,9 +19,11 @@ SoundImagineAudioProcessor::SoundImagineAudioProcessor()
 #endif
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)
 #endif
-      )
+                         )
 #endif
-{
+    ,
+    forwardFFT(SharedAudioData::FFT_ORDER),
+    shared_audio_data(new SharedAudioData()) {
 }
 
 SoundImagineAudioProcessor::~SoundImagineAudioProcessor()
@@ -151,9 +153,7 @@ void SoundImagineAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, 
     // interleaved by keeping the same state.
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        auto *channelData = buffer.getWritePointer(channel);
-
-        // ..do something to the data...
+        auto *channelData = buffer.getReadPointer(channel);
     }
 }
 
@@ -187,4 +187,43 @@ void SoundImagineAudioProcessor::setStateInformation(const void *data, int sizeI
 juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter()
 {
     return new SoundImagineAudioProcessor();
+}
+
+void SoundImagineAudioProcessor::getNextAudioBlock(const juce::AudioSourceChannelInfo &bufferToFill)
+{
+    try
+    {
+        if (bufferToFill.buffer->getNumChannels() > 0)
+        {
+            const auto *channelData = bufferToFill.buffer->getReadPointer(0, bufferToFill.startSample);
+
+            for (int i = 0; i < bufferToFill.numSamples; ++i)
+            {
+            }
+        }
+    }
+    catch (std::exception &e)
+    {
+        std::cerr << "Error: " << e.what() << std::endl;
+    }
+}
+
+void SoundImagineAudioProcessor::pushSample(float sample)
+{
+}
+
+void SoundImagineAudioProcessor::performFFT()
+{
+    try
+    {
+    }
+    catch (std::exception &e)
+    {
+        std::cerr << "Error: " << e.what() << std::endl;
+    }
+}
+
+std::shared_ptr<SharedAudioData> SoundImagineAudioProcessor::getSharedAudioData()
+{
+    return shared_audio_data;
 }

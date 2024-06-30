@@ -55,7 +55,6 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     void performFFT();
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo &bufferToFill);
     void pushSample(float sample);
 
 
@@ -65,7 +64,8 @@ public:
 private:
     juce::dsp::FFT forwardFFT;
     std::shared_ptr<SharedAudioData> shared_audio_data;
-    float buffer[SharedAudioData::FFT_SIZE * 2];
+    float audio_buffer[SharedAudioData::FFT_SIZE * 2];
+    float fft_buffer[SharedAudioData::FFT_SIZE * 2];
     int buffer_index = 0;
     
     //==============================================================================

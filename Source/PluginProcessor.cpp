@@ -142,18 +142,17 @@ void SoundImagineAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, 
     // This is here to avoid people getting screaming feedback
     // when they first compile a plugin, but obviously you don't need to keep
     // this code if your algorithm always overwrites all the output channels.
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
         buffer.clear(i, 0, buffer.getNumSamples());
+    }
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
         auto *channelData = buffer.getReadPointer(channel);
+
+        for (int i = 0; i < buffer.getNumSamples(); ++i) {
+            pushSample(channelData[i]);
+        }
     }
 }
 
@@ -189,27 +188,17 @@ juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter()
     return new SoundImagineAudioProcessor();
 }
 
-void SoundImagineAudioProcessor::getNextAudioBlock(const juce::AudioSourceChannelInfo &bufferToFill)
-{
-    try
-    {
-        if (bufferToFill.buffer->getNumChannels() > 0)
-        {
-            const auto *channelData = bufferToFill.buffer->getReadPointer(0, bufferToFill.startSample);
-
-            for (int i = 0; i < bufferToFill.numSamples; ++i)
-            {
-            }
-        }
-    }
-    catch (std::exception &e)
-    {
-        std::cerr << "Error: " << e.what() << std::endl;
-    }
-}
-
 void SoundImagineAudioProcessor::pushSample(float sample)
 {
+    if (buffer_index == SharedAudioData::FFT_SIZE) {
+        if (!SharedAudioData::is_next_fft_block_ready) {
+            juce::zeromem(fft_buffer, sizeof(fft_buffer));
+            memcpy(fft_buffer, audio_buffer, sizeof(audio_buffer));
+            SharedAudioData::is_next_fft_block_ready = true;
+        }
+        buffer_index = 0;
+    }
+    audio_buffer[buffer_index++] = sample;
 }
 
 void SoundImagineAudioProcessor::performFFT()

@@ -31,7 +31,6 @@ void Imager::drawFFTData()
 {
     if (shared_audio_data->is_next_fft_block_ready)
     {
-        float *fft_data = shared_audio_data->getFFTData();
-        // shared_audio_data->is_next_fft_block_ready = false;
+        // float *fft_data = shared_audio_data->getFFTData();
     }
 }

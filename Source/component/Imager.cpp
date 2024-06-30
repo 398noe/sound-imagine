@@ -35,4 +35,3 @@ void Imager::drawFFTData()
         // shared_audio_data->is_next_fft_block_ready = false;
     }
 }
-

@@ -54,12 +54,19 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    void performFFT();
+    void getNextAudioBlock(const juce::AudioSourceChannelInfo &bufferToFill);
+    void pushSample(float sample);
+
+
     //==============================================================================
+    std::shared_ptr<SharedAudioData> getSharedAudioData();
 
 private:
     juce::dsp::FFT forwardFFT;
+    std::shared_ptr<SharedAudioData> shared_audio_data;
     float buffer[SharedAudioData::FFT_SIZE * 2];
-    int bufferIndex = 0;
+    int buffer_index = 0;
     
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SoundImagineAudioProcessor)

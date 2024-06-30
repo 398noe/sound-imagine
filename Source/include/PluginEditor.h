@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "AudioUtilities.h"
+#include "lib/AudioUtilities.h"
 #include "PluginProcessor.h"
 
 //==============================================================================

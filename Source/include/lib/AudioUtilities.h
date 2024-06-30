@@ -1,4 +1,4 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include <JucePluginDefines.h>
+#include "../../JuceLibraryCode/JucePluginDefines.h"

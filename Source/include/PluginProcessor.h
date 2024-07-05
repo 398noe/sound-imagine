@@ -9,7 +9,7 @@
 #pragma once
 
 #include "lib/AudioUtilities.h"
-#include "lib/SharedAudioData.h"
+#include "lib/Manager.h"
 
 //==============================================================================
 /**
@@ -54,19 +54,12 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    void performFFT();
-    void pushSample(float sample);
-
 
     //==============================================================================
-    std::shared_ptr<SharedAudioData> getSharedAudioData();
+    std::shared_ptr<Manager> getManager() const noexcept;
 
 private:
-    juce::dsp::FFT forwardFFT;
-    std::shared_ptr<SharedAudioData> shared_audio_data;
-    float audio_buffer[SharedAudioData::FFT_SIZE * 2];
-    float fft_buffer[SharedAudioData::FFT_SIZE * 2];
-    int buffer_index = 0;
+    std::shared_ptr<Manager> manager;
     
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SoundImagineAudioProcessor)

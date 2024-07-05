@@ -1,8 +1,10 @@
 #pragma once
 
 #include "AudioUtilities.h"
-#include "Manager.h"
+#include "Constant.h"
 #include <cstdint>
+
+class Manager;
 
 class Processor
 {
@@ -21,7 +23,7 @@ public:
 
 private:
     juce::dsp::FFT forwardFFT;
-    float fft_result[Manager::FFT_SIZE];
-    float buffer[Manager::FFT_SIZE];
+    float fft_result[FFTConstants::FFT_SIZE];
+    float buffer[FFTConstants::FFT_SIZE];
     uint16_t buffer_idx = 0;
 };

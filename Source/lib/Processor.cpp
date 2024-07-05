@@ -1,6 +1,7 @@
 #include "lib/Processor.h"
+#include "lib/Constant.h"
 
-Processor::Processor() : forwardFFT(Manager::FFT_ORDER)
+Processor::Processor() : forwardFFT(FFTConstants::FFT_ORDER)
 {
 }
 
@@ -13,7 +14,7 @@ void Processor::doFFT()
     float* block = getAudioSample(buffer_idx);
     forwardFFT.performRealOnlyForwardTransform(block);
     // block means fft result data
-    for (int i = 0; i < Manager::FFT_SIZE; i++)
+    for (int i = 0; i < FFTConstants::FFT_SIZE; i++)
     {
         fft_result[i] = block[i];
     }
@@ -25,9 +26,9 @@ float* Processor::getFFTResult()
 }
 
 float* Processor::cloneAudioSample() {
-    float block[Manager::FFT_SIZE];
+    float block[FFTConstants::FFT_SIZE];
     juce::zeromem(block, sizeof(block));
-    for (int i = 0; i < Manager::FFT_SIZE; i++)
+    for (int i = 0; i < FFTConstants::FFT_SIZE; i++)
     {
         block[i] = buffer[i];
     }
@@ -36,11 +37,11 @@ float* Processor::cloneAudioSample() {
 
 float* Processor::getAudioSample(uint16_t start = 0)
 {
-    float block[Manager::FFT_SIZE];
+    float block[FFTConstants::FFT_SIZE];
     juce::zeromem(block, sizeof(buffer));
-    for (int i = 0; i < Manager::FFT_SIZE; i++)
+    for (int i = 0; i < FFTConstants::FFT_SIZE; i++)
     {
-        block[i] = buffer[(start + i) & Manager::FFT_MASK];
+        block[i] = buffer[(start + i) & FFTConstants::FFT_MASK];
     }
     return block;
 }
@@ -48,7 +49,7 @@ float* Processor::getAudioSample(uint16_t start = 0)
 void Processor::addAudioSample(float sample)
 {
     buffer[buffer_idx++] = sample;
-    buffer_idx &= Manager::FFT_MASK;
+    buffer_idx &= FFTConstants::FFT_MASK;
 }
 
 uint16_t Processor::getBufferIdx()

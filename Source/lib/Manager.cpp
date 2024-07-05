@@ -1,6 +1,6 @@
 #include "lib/Manager.h"
 
-Manager::Manager()
+Manager::Manager(): processor()
 {
 }
 
@@ -24,7 +24,7 @@ void Manager::setFFTResult() {
     for (int i = 0; i < 2; i++)
     {
         float* fft = processor[i].getFFTResult();
-        for (int j = 0; j < FFT_SIZE; j++)
+        for (int j = 0; j < FFTConstants::FFT_SIZE; j++)
         {
             this->fft_result[i][j] = fft[j];
         }
@@ -40,5 +40,5 @@ void Manager::inferLR() {}
 
 bool Manager::isAudioBufferReady()
 {
-    return processor[0].getBufferIdx() == FFT_MASK && processor[1].getBufferIdx() == FFT_SIZE;
+    return processor[0].getBufferIdx() == FFTConstants::FFT_SIZE && processor[1].getBufferIdx() == FFTConstants::FFT_SIZE;
 }

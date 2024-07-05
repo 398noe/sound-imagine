@@ -4,10 +4,6 @@
 
 class Manager {
 public:
-    static const int FFT_ORDER = 10;
-    static constexpr int FFT_SIZE = 1 << FFT_ORDER;
-    static constexpr int FFT_MASK = FFT_SIZE - 1;
-
     Manager();
     ~Manager();
 
@@ -21,6 +17,6 @@ public:
     bool isAudioBufferReady();
 
 private:
-    Processor processor[2]; // 0 is for left channel, 1 is for right
-    float fft_result[2][FFT_SIZE];
+    Processor processor[2];
+    float fft_result[2][FFTConstants::FFT_SIZE];
 };

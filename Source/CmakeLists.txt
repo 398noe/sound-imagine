@@ -28,6 +28,7 @@ target_sources(${PROJECT_NAME}
         PluginProcessor.cpp
         PluginEditor.cpp
         include/lib/AudioUtilities.h
+        include/lib/Constant.h
         include/lib/Manager.h
         include/lib/Processor.h
         include/PluginProcessor.h

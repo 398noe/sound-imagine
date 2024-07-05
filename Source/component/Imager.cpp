@@ -31,4 +31,10 @@ void Imager::timerCallback() {
     }
 }
 
-void Imager::drawFFTData() { fft_data = manager->getFFTResult(); }
+void Imager::drawFFTData() {
+    manager->calculatePowerSpectrum();
+    manager->calculatePowerSpectrum();
+    fft_data = manager->getFFTResult();
+    power_spectrum = manager->getPowerSpectrum();
+    energy_difference = manager->getEnergyDifference();
+}

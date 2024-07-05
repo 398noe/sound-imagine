@@ -18,6 +18,13 @@ void Manager::calculatePowerSpectrum() {
     }
 }
 
+void Manager::calculateEnergyDifference() {
+    for (int i = 0; i < FFTConstants::FFT_LENGTH; i++) {
+        this->energy_difference[0][i] = power_spectrum[0][i] - power_spectrum[1][i]; // LR
+        this->energy_difference[1][i] = power_spectrum[2][i] - power_spectrum[3][i]; // MS
+    }
+}
+
 void Manager::addAudioSampleOnce(float left, float right) {
     processor[0].addAudioSample(left);               // left
     processor[1].addAudioSample(right);              // right
@@ -39,20 +46,8 @@ void Manager::setFFTResult() {
 
 std::array<float[FFTConstants::FFT_LENGTH], 4> Manager::getFFTResult() { return fft_result; }
 std::array<float[FFTConstants::FFT_LENGTH], 4> Manager::getPowerSpectrum() { return power_spectrum; }
+std::array<float[FFTConstants::FFT_LENGTH], 2> Manager::getEnergyDifference() { return energy_difference; }
 
-float *Manager::getFFTResult(int channel) { return fft_result[channel]; }
-
-void Manager::inferLR() {
-    float *left = fft_result[0];
-    float *right = fft_result[1];
-
-    for (int i = 0; i < FFTConstants::FFT_LENGTH; i++) {
-        float l = left[i];
-        float r = right[i];
-
-        left[i] = (l + r) / 2;
-        right[i] = (l - r) / 2;
-    }
-}
+void Manager::inferLR() {}
 
 int Manager::getBufferIdx(int channel) { return processor[channel].getBufferIdx(); }

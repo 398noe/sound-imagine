@@ -11,6 +11,7 @@ public:
     ~Processor();
 
     void doFFT();
+    float* getFFTResult();
 
     float* cloneAudioSample(); // clone buffer
     float* getAudioSample(uint16_t start); // get buffer in chronological order
@@ -20,6 +21,7 @@ public:
 
 private:
     juce::dsp::FFT forwardFFT;
+    float fft_result[Manager::FFT_SIZE];
     float buffer[Manager::FFT_SIZE];
     uint16_t buffer_idx = 0;
 };

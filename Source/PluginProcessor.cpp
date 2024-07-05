@@ -151,6 +151,10 @@ void SoundImagineAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, 
 
         for (int i = 0; i < buffer.getNumSamples(); ++i) {
             manager->addAudioSample(channelData[i], channel);
+            if (manager->isAudioBufferReady()) {
+                manager->calculateFFT();
+                manager->setFFTResult();
+            }
         }
     }
 }

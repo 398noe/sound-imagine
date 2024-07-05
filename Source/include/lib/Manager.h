@@ -13,6 +13,8 @@ public:
 
     void addAudioSample(float sample, int channel);
     void calculateFFT();
+    void setFFTResult();
+    float* getFFTResult(int channel);
 
     void inferLR();
 
@@ -20,4 +22,5 @@ public:
 
 private:
     Processor processor[2]; // 0 is for left channel, 1 is for right
+    float fft_result[2][FFT_SIZE];
 };

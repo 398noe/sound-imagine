@@ -1,4 +1,4 @@
-#include "Processor.h"
+#include "lib/Processor.h"
 
 Processor::Processor() : forwardFFT(Manager::FFT_ORDER)
 {
@@ -13,6 +13,15 @@ void Processor::doFFT()
     float* block = getAudioSample(buffer_idx);
     forwardFFT.performRealOnlyForwardTransform(block);
     // block means fft result data
+    for (int i = 0; i < Manager::FFT_SIZE; i++)
+    {
+        fft_result[i] = block[i];
+    }
+}
+
+float* Processor::getFFTResult()
+{
+    return fft_result;
 }
 
 float* Processor::cloneAudioSample() {

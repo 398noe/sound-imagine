@@ -18,7 +18,7 @@ class Imager : public juce::Component, private juce::Timer {
   private:
     bool is_next_block_drawable = true;
     std::shared_ptr<Manager> manager;
-    std::array<float[FFTConstants::FFT_LENGTH], 2> fft_data;
+    std::array<float[FFTConstants::FFT_LENGTH], 4> fft_data;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Imager)
 };

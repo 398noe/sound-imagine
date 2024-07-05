@@ -120,22 +120,23 @@ void SoundImagineAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, 
         buffer.clear(i, 0, buffer.getNumSamples());
     }
 
-    for (int channel = 0; channel < totalNumInputChannels; ++channel) {
-        auto *channelData = buffer.getReadPointer(channel);
+    if (totalNumInputChannels == 0) {
+        return;
+    }
 
-        for (int i = 0; i < buffer.getNumSamples(); ++i) {
-            manager->addAudioSample(channelData[i], channel);
+    auto *leftChannel = buffer.getReadPointer(0);
+    auto *rightChannel = buffer.getReadPointer((totalNumInputChannels == 1) ? 0 : 1 );
 
-            if (channel == 1) {
-                from_last_fft++;
-            }
+    for (int i = 0; i < buffer.getNumSamples(); ++i) {
+        manager->addAudioSampleOnce(leftChannel[i], rightChannel[i]);
 
-            if (from_last_fft >= FFTConstants::HOP_LENGTH) {
-                manager->calculateFFT();
-                manager->setFFTResult();
+        from_last_fft++;
 
-                from_last_fft = 0;
-            }
+        if (from_last_fft >= FFTConstants::HOP_LENGTH) {
+            manager->calculateFFT();
+            manager->setFFTResult();
+
+            from_last_fft = 0;
         }
     }
 }

@@ -22,10 +22,24 @@ juce_generate_juce_header(${PROJECT_NAME})
 
 target_sources(${PROJECT_NAME}
     PRIVATE
+        lib/AudioUtilities.cpp
+        lib/Manager.cpp
+        lib/Processor.cpp
+        component/Imager.cpp
         PluginProcessor.cpp
         PluginEditor.cpp
-        PluginProcessor.h
-        PluginEditor.h
+        include/lib/AudioUtilities.h
+        include/lib/Constant.h
+        include/lib/Manager.h
+        include/lib/Processor.h
+        include/PluginProcessor.h
+        include/PluginEditor.h
+        include/component/Imager.h
+)
+
+target_include_directories("${PROJECT_NAME}"
+    PRIVATE
+        include
 )
 
 target_compile_definitions("${PROJECT_NAME}"

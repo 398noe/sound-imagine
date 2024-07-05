@@ -44,6 +44,10 @@ void Manager::setFFTResult() {
     }
 }
 
+void Manager::setSampleRate(double sr) { this->sample_rate = sr; }
+
+double Manager::getSampleRate() { return this->sample_rate; }
+
 std::array<float[FFTConstants::FFT_LENGTH], 4> Manager::getFFTResult() { return fft_result; }
 std::array<float[FFTConstants::FFT_LENGTH], 4> Manager::getPowerSpectrum() { return power_spectrum; }
 std::array<float[FFTConstants::FFT_LENGTH], 2> Manager::getEnergyDifference() { return energy_difference; }

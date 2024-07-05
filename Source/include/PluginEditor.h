@@ -8,26 +8,25 @@
 
 #pragma once
 
-#include "lib/AudioUtilities.h"
 #include "PluginProcessor.h"
+#include "lib/AudioUtilities.h"
 
 //==============================================================================
 /**
-*/
-class SoundImagineAudioProcessorEditor  : public juce::AudioProcessorEditor
-{
-public:
-    SoundImagineAudioProcessorEditor (SoundImagineAudioProcessor&);
+ */
+class SoundImagineAudioProcessorEditor : public juce::AudioProcessorEditor {
+  public:
+    SoundImagineAudioProcessorEditor(SoundImagineAudioProcessor &);
     ~SoundImagineAudioProcessorEditor() override;
 
     //==============================================================================
-    void paint (juce::Graphics&) override;
+    void paint(juce::Graphics &) override;
     void resized() override;
 
-private:
+  private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
-    SoundImagineAudioProcessor& audioProcessor;
+    SoundImagineAudioProcessor &audioProcessor;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SoundImagineAudioProcessorEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SoundImagineAudioProcessorEditor)
 };

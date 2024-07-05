@@ -3,9 +3,8 @@
 #include "lib/AudioUtilities.h"
 #include "lib/Manager.h"
 
-class Imager : public juce::Component, private juce::Timer
-{
-public:
+class Imager : public juce::Component, private juce::Timer {
+  public:
     Imager(std::shared_ptr<Manager> data);
     ~Imager() override;
 
@@ -16,10 +15,10 @@ public:
 
     void drawFFTData();
 
-private:
+  private:
     bool is_next_fft_block_drawable = true;
     std::shared_ptr<Manager> manager;
-    
+
     float LRMS = 0.0f;
     float RRMS = 0.0f;
 

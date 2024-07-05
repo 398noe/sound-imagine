@@ -21,22 +21,16 @@ SoundImagineAudioProcessor::SoundImagineAudioProcessor()
 #endif
                          )
 #endif
-    , manager(std::make_shared<Manager>())
-{
+      ,
+      manager(std::make_shared<Manager>()) {
 }
 
-SoundImagineAudioProcessor::~SoundImagineAudioProcessor()
-{
-}
+SoundImagineAudioProcessor::~SoundImagineAudioProcessor() {}
 
 //==============================================================================
-const juce::String SoundImagineAudioProcessor::getName() const
-{
-    return JucePlugin_Name;
-}
+const juce::String SoundImagineAudioProcessor::getName() const { return JucePlugin_Name; }
 
-bool SoundImagineAudioProcessor::acceptsMidi() const
-{
+bool SoundImagineAudioProcessor::acceptsMidi() const {
 #if JucePlugin_WantsMidiInput
     return true;
 #else
@@ -44,8 +38,7 @@ bool SoundImagineAudioProcessor::acceptsMidi() const
 #endif
 }
 
-bool SoundImagineAudioProcessor::producesMidi() const
-{
+bool SoundImagineAudioProcessor::producesMidi() const {
 #if JucePlugin_ProducesMidiOutput
     return true;
 #else
@@ -53,8 +46,7 @@ bool SoundImagineAudioProcessor::producesMidi() const
 #endif
 }
 
-bool SoundImagineAudioProcessor::isMidiEffect() const
-{
+bool SoundImagineAudioProcessor::isMidiEffect() const {
 #if JucePlugin_IsMidiEffect
     return true;
 #else
@@ -62,51 +54,34 @@ bool SoundImagineAudioProcessor::isMidiEffect() const
 #endif
 }
 
-double SoundImagineAudioProcessor::getTailLengthSeconds() const
-{
-    return 0.0;
-}
+double SoundImagineAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
-int SoundImagineAudioProcessor::getNumPrograms()
-{
+int SoundImagineAudioProcessor::getNumPrograms() {
     return 1; // NB: some hosts don't cope very well if you tell them there are 0 programs,
               // so this should be at least 1, even if you're not really implementing programs.
 }
 
-int SoundImagineAudioProcessor::getCurrentProgram()
-{
-    return 0;
-}
+int SoundImagineAudioProcessor::getCurrentProgram() { return 0; }
 
-void SoundImagineAudioProcessor::setCurrentProgram(int index)
-{
-}
+void SoundImagineAudioProcessor::setCurrentProgram(int index) {}
 
-const juce::String SoundImagineAudioProcessor::getProgramName(int index)
-{
-    return {};
-}
+const juce::String SoundImagineAudioProcessor::getProgramName(int index) { return {}; }
 
-void SoundImagineAudioProcessor::changeProgramName(int index, const juce::String &newName)
-{
-}
+void SoundImagineAudioProcessor::changeProgramName(int index, const juce::String &newName) {}
 
 //==============================================================================
-void SoundImagineAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
-{
+void SoundImagineAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
 }
 
-void SoundImagineAudioProcessor::releaseResources()
-{
+void SoundImagineAudioProcessor::releaseResources() {
     // When playback stops, you can use this as an opportunity to free up any
     // spare memory, etc.
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
-bool SoundImagineAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const
-{
+bool SoundImagineAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const {
 #if JucePlugin_IsMidiEffect
     juce::ignoreUnused(layouts);
     return true;
@@ -115,7 +90,8 @@ bool SoundImagineAudioProcessor::isBusesLayoutSupported(const BusesLayout &layou
     // In this template code we only support mono or stereo.
     // Some plugin hosts, such as certain GarageBand versions, will only
     // load plugins that support stereo bus layouts.
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono() && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono() &&
+        layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
         return false;
 
         // This checks if the input layout matches the output layout
@@ -129,8 +105,7 @@ bool SoundImagineAudioProcessor::isBusesLayoutSupported(const BusesLayout &layou
 }
 #endif
 
-void SoundImagineAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages)
-{
+void SoundImagineAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages) {
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -145,8 +120,7 @@ void SoundImagineAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, 
         buffer.clear(i, 0, buffer.getNumSamples());
     }
 
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
+    for (int channel = 0; channel < totalNumInputChannels; ++channel) {
         auto *channelData = buffer.getReadPointer(channel);
 
         for (int i = 0; i < buffer.getNumSamples(); ++i) {
@@ -160,36 +134,27 @@ void SoundImagineAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, 
 }
 
 //==============================================================================
-bool SoundImagineAudioProcessor::hasEditor() const
-{
+bool SoundImagineAudioProcessor::hasEditor() const {
     return true; // (change this to false if you choose to not supply an editor)
 }
 
-juce::AudioProcessorEditor *SoundImagineAudioProcessor::createEditor()
-{
-    return new SoundImagineAudioProcessorEditor(*this);
-}
+juce::AudioProcessorEditor *SoundImagineAudioProcessor::createEditor() { return new SoundImagineAudioProcessorEditor(*this); }
 
 //==============================================================================
-void SoundImagineAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
-{
+void SoundImagineAudioProcessor::getStateInformation(juce::MemoryBlock &destData) {
     // You should use this method to store your parameters in the memory block.
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
 }
 
-void SoundImagineAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
-{
+void SoundImagineAudioProcessor::setStateInformation(const void *data, int sizeInBytes) {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
 }
 
 //==============================================================================
 // This creates new instances of the plugin..
-juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter()
-{
-    return new SoundImagineAudioProcessor();
-}
+juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter() { return new SoundImagineAudioProcessor(); }
 
 // void SoundImagineAudioProcessor::pushSample(float sample)
 // {
@@ -215,7 +180,4 @@ juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter()
 //     }
 // }
 
-std::shared_ptr<Manager> SoundImagineAudioProcessor::getManager() const noexcept
-{
-    return manager;
-}
+std::shared_ptr<Manager> SoundImagineAudioProcessor::getManager() const noexcept { return manager; }

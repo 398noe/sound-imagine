@@ -1,6 +1,6 @@
 #pragma once
 
-#include <JuceHeader.h>
 #include "../../JuceLibraryCode/JucePluginDefines.h"
+#include <JuceHeader.h>
 
-float calculateRMS(float* buffer);
+float calculateRMS(float *buffer);

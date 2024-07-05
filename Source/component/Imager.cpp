@@ -1,17 +1,10 @@
 #include "component/Imager.h"
 
-Imager::Imager(std::shared_ptr<Manager> data) : manager(data)
-{
-    startTimerHz(60);
-}
+Imager::Imager(std::shared_ptr<Manager> data) : manager(data) { startTimerHz(60); }
 
-Imager::~Imager()
-{
-    stopTimer();
-}
+Imager::~Imager() { stopTimer(); }
 
-void Imager::paint(juce::Graphics &g)
-{
+void Imager::paint(juce::Graphics &g) {
     g.fillAll(juce::Colours::black);
     g.setColour(juce::Colours::white);
     g.drawText(juce::String(LRMS), getLocalBounds().removeFromTop(20), juce::Justification::centred);
@@ -19,19 +12,14 @@ void Imager::paint(juce::Graphics &g)
     g.drawRect(getLocalBounds(), 1);
 }
 
-void Imager::resized()
-{
-    repaint();
-}
+void Imager::resized() { repaint(); }
 
-void Imager::timerCallback()
-{
+void Imager::timerCallback() {
     drawFFTData();
     repaint();
 }
 
-void Imager::drawFFTData()
-{
+void Imager::drawFFTData() {
     // サンプルの値からデシベルを計算
     auto LAudioSample = manager->getAudioSample(0);
     auto RAudioSample = manager->getAudioSample(1);

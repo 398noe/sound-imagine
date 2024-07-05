@@ -9,8 +9,8 @@
 #pragma once
 
 #include "PluginProcessor.h"
-#include "lib/AudioUtilities.h"
 #include "component/Imager.h"
+#include "lib/AudioUtilities.h"
 
 //==============================================================================
 /**

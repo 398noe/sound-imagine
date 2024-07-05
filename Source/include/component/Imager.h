@@ -16,7 +16,7 @@ class Imager : public juce::Component, private juce::Timer {
     void drawFFTData();
 
   private:
-    bool is_next_fft_block_drawable = true;
+    bool is_next_block_drawable = true;
     std::shared_ptr<Manager> manager;
 
     float LRMS = 0.0f;

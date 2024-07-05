@@ -15,8 +15,12 @@ void Imager::paint(juce::Graphics &g) {
 void Imager::resized() { repaint(); }
 
 void Imager::timerCallback() {
-    drawFFTData();
-    repaint();
+    if (this->is_next_block_drawable) {
+        this->is_next_block_drawable = false;
+        drawFFTData();
+        this->is_next_block_drawable = true;
+        repaint();
+    }
 }
 
 void Imager::drawFFTData() {

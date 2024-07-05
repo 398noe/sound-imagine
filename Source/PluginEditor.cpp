@@ -24,11 +24,10 @@ SoundImagineAudioProcessorEditor::~SoundImagineAudioProcessorEditor() {}
 void SoundImagineAudioProcessorEditor::paint(juce::Graphics &g) {
     // (Our component is opaque, so we must completely fill the background with a solid colour)
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
-    
 }
 
 void SoundImagineAudioProcessorEditor::resized() {
     // This is generally where you'll want to lay out the positions of any
     // subcomponents in your editor..
-    imager.setBounds(0,0,getWidth(),getHeight());
+    imager.setBounds(0, 0, getWidth(), getHeight());
 }

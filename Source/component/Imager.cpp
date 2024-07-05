@@ -1,8 +1,7 @@
 #include "component/Imager.h"
 
-Imager::Imager(std::shared_ptr<SharedAudioData> data) : shared_audio_data(data)
+Imager::Imager(std::shared_ptr<Manager> data) : manager(data)
 {
-    // shared_audio_data = std::make_shared<SharedAudioData>();
     startTimerHz(60);
 }
 
@@ -29,8 +28,4 @@ void Imager::timerCallback()
 
 void Imager::drawFFTData()
 {
-    if (shared_audio_data->is_next_fft_block_ready)
-    {
-        // float *fft_data = shared_audio_data->getFFTData();
-    }
 }

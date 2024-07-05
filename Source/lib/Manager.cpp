@@ -23,10 +23,10 @@ void Manager::addAudioSample(float sample, int channel)
 void Manager::setFFTResult() {
     for (int i = 0; i < 2; i++)
     {
-        float* fft_result = processor[i].getFFTResult();
+        float* fft = processor[i].getFFTResult();
         for (int j = 0; j < FFT_SIZE; j++)
         {
-            this->fft_result[i][j] = fft_result[j];
+            this->fft_result[i][j] = fft[j];
         }
     }
 }

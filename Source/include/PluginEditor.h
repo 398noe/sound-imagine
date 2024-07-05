@@ -10,6 +10,7 @@
 
 #include "PluginProcessor.h"
 #include "lib/AudioUtilities.h"
+#include "component/Imager.h"
 
 //==============================================================================
 /**
@@ -27,6 +28,9 @@ class SoundImagineAudioProcessorEditor : public juce::AudioProcessorEditor {
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     SoundImagineAudioProcessor &audioProcessor;
+
+    // Components
+    Imager imager;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SoundImagineAudioProcessorEditor)
 };

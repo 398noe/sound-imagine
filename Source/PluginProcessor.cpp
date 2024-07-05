@@ -127,7 +127,7 @@ void SoundImagineAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, 
             manager->addAudioSample(channelData[i], channel);
             if (manager->isAudioBufferReady()) {
                 manager->calculateFFT();
-                // manager->setFFTResult();
+                manager->setFFTResult();
             }
         }
     }
@@ -155,29 +155,5 @@ void SoundImagineAudioProcessor::setStateInformation(const void *data, int sizeI
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter() { return new SoundImagineAudioProcessor(); }
-
-// void SoundImagineAudioProcessor::pushSample(float sample)
-// {
-//     if (buffer_index == SharedAudioData::FFT_SIZE) {
-//         if (!SharedAudioData::is_next_fft_block_ready) {
-//             juce::zeromem(fft_buffer, sizeof(fft_buffer));
-//             memcpy(fft_buffer, audio_buffer, sizeof(audio_buffer));
-//             SharedAudioData::is_next_fft_block_ready = true;
-//         }
-//         buffer_index = 0;
-//     }
-//     audio_buffer[buffer_index++] = sample;
-// }
-
-// void SoundImagineAudioProcessor::performFFT()
-// {
-//     try
-//     {
-//     }
-//     catch (std::exception &e)
-//     {
-//         std::cerr << "Error: " << e.what() << std::endl;
-//     }
-// }
 
 std::shared_ptr<Manager> SoundImagineAudioProcessor::getManager() const noexcept { return manager; }

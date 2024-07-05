@@ -8,12 +8,14 @@ void Imager::paint(juce::Graphics &g) {
     g.fillAll(juce::Colours::black);
 
     const int grid_size = 20;
-    auto fft_data = manager->getFFTResult(0);
-    const int num_squares = fft_data.size();
+    const int num_squares = fft_data[0].size();
+    g.setColour(juce::Colours::white);
+    g.drawText("Imager", 0, 0, getWidth(), 20, juce::Justification::centred);
+    g.drawText("num squares: " + std::to_string(num_squares), 0, 20, getWidth(), 20, juce::Justification::centred);
     const int square_size = getWidth() / grid_size;
 
     for (int i = 0; i < num_squares; ++i) {
-        float value = fft_data[i];
+        float value = fft_data[0][i];
         juce::Colour colour = juce::Colour::fromHSV(0.5f + 0.5f * value, 1.0f, 1.0f, 1.0f);
         int x = (i % grid_size) * square_size;
         int y = (i / grid_size) * square_size;
@@ -35,11 +37,7 @@ void Imager::timerCallback() {
 }
 
 void Imager::drawFFTData() {
-    // サンプルの値からデシベルを計算
-    auto LAudioSample = manager->getAudioSample(0);
-    auto RAudioSample = manager->getAudioSample(1);
-
-    // RMSをとる
-    this->LRMS = calculateRMS(LAudioSample);
-    this->RRMS = calculateRMS(RAudioSample);
+    // LFFT, RFFTからデシベルを計算
+    fft_data[0] = manager->getFFTResult(0);
+    fft_data[1] = manager->getFFTResult(1);
 }

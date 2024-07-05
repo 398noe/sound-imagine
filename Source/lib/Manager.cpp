@@ -31,5 +31,5 @@ std::vector<float> Manager::getFFTResult(int channel) { return fft_result[channe
 void Manager::inferLR() {}
 
 bool Manager::isAudioBufferReady() {
-    return processor[0].getBufferIdx() == FFTConstants::FFT_SIZE && processor[1].getBufferIdx() == FFTConstants::FFT_SIZE;
+    return processor[0].getBufferIdx() == FFTConstants::FFT_MASK && processor[1].getBufferIdx() == FFTConstants::FFT_MASK;
 }

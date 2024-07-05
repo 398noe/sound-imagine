@@ -36,6 +36,8 @@ float* Manager::getFFTResult(int channel)
     return fft_result[channel];
 }
 
+void Manager::inferLR() {}
+
 bool Manager::isAudioBufferReady()
 {
     return processor[0].getBufferIdx() == FFT_MASK && processor[1].getBufferIdx() == FFT_SIZE;

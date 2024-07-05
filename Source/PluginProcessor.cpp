@@ -150,7 +150,7 @@ void SoundImagineAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, 
         auto *channelData = buffer.getReadPointer(channel);
 
         for (int i = 0; i < buffer.getNumSamples(); ++i) {
-            pushSample(channelData[i]);
+            manager->addAudioSample(channelData[i], channel);
         }
     }
 }

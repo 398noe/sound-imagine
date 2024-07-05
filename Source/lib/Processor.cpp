@@ -41,3 +41,8 @@ void Processor::addAudioSample(float sample)
     buffer[buffer_idx++] = sample;
     buffer_idx &= SharedAudioData::FFT_MASK;
 }
+
+uint16_t Processor::getBufferIdx()
+{
+    return buffer_idx;
+}

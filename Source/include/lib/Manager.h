@@ -16,6 +16,8 @@ public:
 
     void inferLR();
 
+    bool isAudioBufferReady();
+
 private:
     Processor processor[2]; // 0 is for left channel, 1 is for right
 };

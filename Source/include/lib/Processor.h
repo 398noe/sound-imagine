@@ -16,6 +16,8 @@ public:
     float* getAudioSample(uint16_t start); // get buffer in chronological order
     void addAudioSample(float sample); // add sample to buffer
 
+    uint16_t getBufferIdx();
+
 private:
     juce::dsp::FFT forwardFFT;
     float buffer[SharedAudioData::FFT_SIZE];

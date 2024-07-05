@@ -5,6 +5,7 @@ class SharedAudioData
 public:
     static const int FFT_ORDER = 10;
     static const int FFT_SIZE = 1 << FFT_ORDER;
+    static const int FFT_MASK = FFT_SIZE - 1;
 
     static bool is_next_fft_block_ready;
     SharedAudioData();

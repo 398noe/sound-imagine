@@ -20,7 +20,7 @@ class Processor {
 
   private:
     juce::dsp::FFT forwardFFT;
-    float fft_result[FFTConstants::FFT_SIZE];
-    float buffer[FFTConstants::FFT_SIZE];
+    float fft_result[FFTConstants::FFT_SIZE] = {0.0f};
+    float buffer[FFTConstants::FFT_SIZE] = {0.0f};
     uint16_t buffer_idx = 0;
 };

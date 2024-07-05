@@ -20,8 +20,8 @@ void Manager::calculatePowerSpectrum() {
 
 void Manager::calculateEnergyDifference() {
     for (int i = 0; i < FFTConstants::FFT_LENGTH; i++) {
-        this->energy_difference[0][i] = power_spectrum[0][i] - power_spectrum[1][i]; // LR
-        this->energy_difference[1][i] = power_spectrum[2][i] - power_spectrum[3][i]; // MS
+        this->energy_difference[0][i] = power_spectrum[1][i] - power_spectrum[0][i]; // LR
+        this->energy_difference[1][i] = power_spectrum[3][i] - power_spectrum[2][i]; // MS
     }
 }
 

@@ -125,7 +125,7 @@ void SoundImagineAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, 
     }
 
     auto *leftChannel = buffer.getReadPointer(0);
-    auto *rightChannel = buffer.getReadPointer((totalNumInputChannels == 1) ? 0 : 1 );
+    auto *rightChannel = buffer.getReadPointer((totalNumInputChannels == 1) ? 0 : 1);
 
     for (int i = 0; i < buffer.getNumSamples(); ++i) {
         manager->addAudioSampleOnce(leftChannel[i], rightChannel[i]);

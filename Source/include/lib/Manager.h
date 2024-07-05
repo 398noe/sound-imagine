@@ -15,11 +15,11 @@ class Manager {
     void setFFTResult();
     std::array<float[FFTConstants::FFT_LENGTH], 4> getFFTResult();
     std::array<float[FFTConstants::FFT_LENGTH], 4> getPowerSpectrum();
-    std::array<float[FFTConstants::FFT_LENGTH], 2> getEnergyDifference();  
+    std::array<float[FFTConstants::FFT_LENGTH], 2> getEnergyDifference();
 
   private:
     Processor processor[4];
-    std::array<float[FFTConstants::FFT_LENGTH], 4> fft_result; // 0: left, 1: right, 2: mid, 3: side
-    std::array<float[FFTConstants::FFT_LENGTH], 4> power_spectrum; // 0: left, 1: right, 2: mid, 3: side
-    std::array<float[FFTConstants::FFT_LENGTH], 2> energy_difference; // 0: LR, 1: MS
+    std::array<float[FFTConstants::FFT_LENGTH], 4> fft_result = {0.0f};        // 0: left, 1: right, 2: mid, 3: side
+    std::array<float[FFTConstants::FFT_LENGTH], 4> power_spectrum = {0.0f};    // 0: left, 1: right, 2: mid, 3: side
+    std::array<float[FFTConstants::FFT_LENGTH], 2> energy_difference = {0.0f}; // 0: LR, 1: MS
 };

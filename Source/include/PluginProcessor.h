@@ -58,6 +58,7 @@ class SoundImagineAudioProcessor : public juce::AudioProcessor {
 
   private:
     std::shared_ptr<Manager> manager;
+    int from_last_fft = 0;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SoundImagineAudioProcessor)

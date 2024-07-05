@@ -15,7 +15,9 @@ SoundImagineAudioProcessorEditor::SoundImagineAudioProcessorEditor(SoundImagineA
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
     addAndMakeVisible(imager);
-    setSize(400, 300);
+    setSize(800, 600);
+    setResizable(true, true);
+    setResizeLimits(400, 300, 1600, 1200);
 }
 
 SoundImagineAudioProcessorEditor::~SoundImagineAudioProcessorEditor() {}

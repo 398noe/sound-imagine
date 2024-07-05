@@ -1,5 +1,4 @@
 #include "lib/Manager.h"
-#include "Manager.h"
 
 Manager::Manager() : processor() {}
 

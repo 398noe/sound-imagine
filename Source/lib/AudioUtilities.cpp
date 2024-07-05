@@ -1,5 +1,5 @@
-#include "AudioUtilities.h"
-#include "Constant.h"
+#include "lib/AudioUtilities.h"
+#include "lib/Constant.h"
 
 float calculateRMS(float *buffer) {
     float sum = 0;

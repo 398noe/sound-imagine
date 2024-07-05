@@ -47,7 +47,3 @@ void Manager::setFFTResult() {
 std::array<float[FFTConstants::FFT_LENGTH], 4> Manager::getFFTResult() { return fft_result; }
 std::array<float[FFTConstants::FFT_LENGTH], 4> Manager::getPowerSpectrum() { return power_spectrum; }
 std::array<float[FFTConstants::FFT_LENGTH], 2> Manager::getEnergyDifference() { return energy_difference; }
-
-void Manager::inferLR() {}
-
-int Manager::getBufferIdx(int channel) { return processor[channel].getBufferIdx(); }

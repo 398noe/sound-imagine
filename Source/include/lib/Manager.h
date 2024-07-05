@@ -15,11 +15,7 @@ class Manager {
     void setFFTResult();
     std::array<float[FFTConstants::FFT_LENGTH], 4> getFFTResult();
     std::array<float[FFTConstants::FFT_LENGTH], 4> getPowerSpectrum();
-    std::array<float[FFTConstants::FFT_LENGTH], 2> getEnergyDifference();
-
-    int getBufferIdx(int channel);
-
-    void inferLR();
+    std::array<float[FFTConstants::FFT_LENGTH], 2> getEnergyDifference();  
 
   private:
     Processor processor[4];

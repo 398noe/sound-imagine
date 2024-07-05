@@ -6,10 +6,21 @@ Imager::~Imager() { stopTimer(); }
 
 void Imager::paint(juce::Graphics &g) {
     g.fillAll(juce::Colours::black);
-    g.setColour(juce::Colours::white);
-    g.drawText(juce::String(LRMS), getLocalBounds().removeFromTop(20), juce::Justification::centred);
-    g.drawText(juce::String(RRMS), getLocalBounds().removeFromTop(40), juce::Justification::centred);
-    g.drawRect(getLocalBounds(), 1);
+
+    const int grid_size = 20;
+    auto fft_data = manager->getFFTResult(0);
+    const int num_squares = fft_data.size();
+    const int square_size = getWidth() / grid_size;
+
+    for (int i = 0; i < num_squares; ++i) {
+        float value = fft_data[i];
+        juce::Colour colour = juce::Colour::fromHSV(0.5f + 0.5f * value, 1.0f, 1.0f, 1.0f);
+        int x = (i % grid_size) * square_size;
+        int y = (i / grid_size) * square_size;
+
+        g.setColour(colour);
+        g.fillRect(x, y, square_size, square_size);
+    }
 }
 
 void Imager::resized() { repaint(); }

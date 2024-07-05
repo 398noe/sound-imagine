@@ -26,7 +26,7 @@ float *Manager::getAudioSample(int channel) {
     return processor[channel].getAudioSample(start);
 }
 
-float *Manager::getFFTResult(int channel) { return fft_result[channel]; }
+std::vector<float> Manager::getFFTResult(int channel) { return fft_result[channel]; }
 
 void Manager::inferLR() {}
 

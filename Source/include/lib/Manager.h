@@ -11,7 +11,7 @@ class Manager {
     void calculateFFT();
     void setFFTResult();
     float *getAudioSample(int channel);
-    float *getFFTResult(int channel);
+    std::vector<float> getFFTResult(int channel);
 
     void inferLR();
 
@@ -19,5 +19,5 @@ class Manager {
 
   private:
     Processor processor[2];
-    float fft_result[2][FFTConstants::FFT_SIZE];
+    std::array<std::vector<float>, 2> fft_result;
 };

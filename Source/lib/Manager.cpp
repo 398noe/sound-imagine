@@ -18,6 +18,16 @@ void Manager::calculatePowerSpectrum() {
     }
 }
 
+void Manager::calculateMidSide() {
+    for (int i = 0; i < FFTConstants::FFT_LENGTH; i++) {
+        float l = fft_result[0][i];
+        float r = fft_result[1][i];
+
+        mid_side[0][i] = (l + r) / 2;
+        mid_side[1][i] = (l - r) / 2;
+    }
+}
+
 void Manager::addAudioSample(float sample, int channel) { processor[channel].addAudioSample(sample); }
 
 void Manager::setFFTResult() {
@@ -32,6 +42,7 @@ void Manager::setFFTResult() {
 
 std::array<float[FFTConstants::FFT_LENGTH], 2> Manager::getFFTResult() { return fft_result; }
 std::array<float[FFTConstants::FFT_LENGTH], 2> Manager::getPowerSpectrum() { return power_spectrum; }
+std::array<float[FFTConstants::FFT_LENGTH], 2> Manager::getMidSide() { return mid_side; }
 
 float *Manager::getFFTResult(int channel) { return fft_result[channel]; }
 

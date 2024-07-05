@@ -10,9 +10,11 @@ class Manager {
     void addAudioSample(float sample, int channel);
     void calculateFFT();
     void calculatePowerSpectrum();
+    void calculateMidSide();
     void setFFTResult();
     std::array<float[FFTConstants::FFT_LENGTH], 2> getFFTResult();
     std::array<float[FFTConstants::FFT_LENGTH], 2> getPowerSpectrum();
+    std::array<float[FFTConstants::FFT_LENGTH], 2> getMidSide();
     float* getFFTResult(int channel);
     int getBufferIdx(int channel);
 
@@ -24,4 +26,5 @@ class Manager {
     Processor processor[2];
     std::array<float[FFTConstants::FFT_LENGTH], 2> fft_result;
     std::array<float[FFTConstants::FFT_LENGTH], 2> power_spectrum;
+    std::array<float[FFTConstants::FFT_LENGTH], 2> mid_side;
 };

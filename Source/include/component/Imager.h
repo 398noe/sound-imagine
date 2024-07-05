@@ -19,6 +19,9 @@ public:
 private:
     bool is_next_fft_block_drawable = true;
     std::shared_ptr<Manager> manager;
+    
+    float LRMS = 0.0f;
+    float RRMS = 0.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Imager)
 };

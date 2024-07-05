@@ -10,6 +10,7 @@ public:
     void addAudioSample(float sample, int channel);
     void calculateFFT();
     void setFFTResult();
+    float* getAudioSample(int channel);
     float* getFFTResult(int channel);
 
     void inferLR();

@@ -9,8 +9,9 @@
 #pragma once
 
 #include "PluginProcessor.h"
-#include "lib/AudioUtilities.h"
 #include "component/Imager.h"
+#include "component/LRImager.h"
+#include "lib/AudioUtilities.h"
 
 //==============================================================================
 /**
@@ -30,7 +31,8 @@ class SoundImagineAudioProcessorEditor : public juce::AudioProcessorEditor {
     SoundImagineAudioProcessor &audioProcessor;
 
     // Components
-    Imager imager;
+    // Imager imager;
+    LRImager lr_imager;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SoundImagineAudioProcessorEditor)
 };

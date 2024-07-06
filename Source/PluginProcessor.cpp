@@ -73,6 +73,7 @@ void SoundImagineAudioProcessor::changeProgramName(int index, const juce::String
 void SoundImagineAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    manager->setSampleRate(sampleRate);
 }
 
 void SoundImagineAudioProcessor::releaseResources() {
@@ -120,15 +121,23 @@ void SoundImagineAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, 
         buffer.clear(i, 0, buffer.getNumSamples());
     }
 
-    for (int channel = 0; channel < totalNumInputChannels; ++channel) {
-        auto *channelData = buffer.getReadPointer(channel);
+    if (totalNumInputChannels == 0) {
+        return;
+    }
 
-        for (int i = 0; i < buffer.getNumSamples(); ++i) {
-            manager->addAudioSample(channelData[i], channel);
-            if (manager->isAudioBufferReady()) {
-                manager->calculateFFT();
-                // manager->setFFTResult();
-            }
+    auto *leftChannel = buffer.getReadPointer(0);
+    auto *rightChannel = buffer.getReadPointer((totalNumInputChannels == 1) ? 0 : 1);
+
+    for (int i = 0; i < buffer.getNumSamples(); ++i) {
+        manager->addAudioSampleOnce(leftChannel[i], rightChannel[i]);
+
+        from_last_fft++;
+
+        if (from_last_fft >= FFTConstants::HOP_LENGTH) {
+            manager->calculateFFT();
+            manager->setFFTResult();
+
+            from_last_fft = 0;
         }
     }
 }
@@ -155,29 +164,5 @@ void SoundImagineAudioProcessor::setStateInformation(const void *data, int sizeI
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter() { return new SoundImagineAudioProcessor(); }
-
-// void SoundImagineAudioProcessor::pushSample(float sample)
-// {
-//     if (buffer_index == SharedAudioData::FFT_SIZE) {
-//         if (!SharedAudioData::is_next_fft_block_ready) {
-//             juce::zeromem(fft_buffer, sizeof(fft_buffer));
-//             memcpy(fft_buffer, audio_buffer, sizeof(audio_buffer));
-//             SharedAudioData::is_next_fft_block_ready = true;
-//         }
-//         buffer_index = 0;
-//     }
-//     audio_buffer[buffer_index++] = sample;
-// }
-
-// void SoundImagineAudioProcessor::performFFT()
-// {
-//     try
-//     {
-//     }
-//     catch (std::exception &e)
-//     {
-//         std::cerr << "Error: " << e.what() << std::endl;
-//     }
-// }
 
 std::shared_ptr<Manager> SoundImagineAudioProcessor::getManager() const noexcept { return manager; }

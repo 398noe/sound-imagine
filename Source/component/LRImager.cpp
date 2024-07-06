@@ -45,7 +45,7 @@ void LRImager::paint(juce::Graphics &g) {
         auto log = std::log10(freq);
         auto left = fft_data[0][i];
         auto right = fft_data[1][i];
-        auto diff = fft_data[0][i] - fft_data[1][i];
+        auto diff = fft_data[1][i] - fft_data[0][i];
         // auto diff = energy_difference[0][i];
         auto left_x = juce::jmap(left, 0.0f, 100.0f, center_x, 0.0f);
         auto right_x = juce::jmap(right, 0.0f, 100.0f, center_x, float(width));
@@ -60,8 +60,8 @@ void LRImager::paint(juce::Graphics &g) {
         auto offset = juce::jmap(diff, -100.0f, 100.0f, -0.5f, 0.5f);
         auto dot_x = (1 + 2.0f * offset) * center_x;
         g.setColour(color);
-        // g.drawLine(dot_x, y, center_x, y, 2.0f);
-        g.fillEllipse(dot_x - 2.0f, y - 2.0f, 4.0f, 4.0f);
+        g.drawLine(dot_x, y, center_x, y, 4.0f);
+        // g.fillEllipse(dot_x - 2.0f, y - 2.0f, 4.0f, 4.0f);
     }
 };
 

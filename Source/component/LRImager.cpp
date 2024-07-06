@@ -5,7 +5,7 @@ LRImager::LRImager(std::shared_ptr<Manager> data) : manager(data) { startTimerHz
 LRImager::~LRImager() { stopTimer(); }
 
 void LRImager::paint(juce::Graphics &g) {
-    if (fft_data.empty() || power_spectrum.empty() || energy_difference.empty()) {
+    if (fft_data.empty()) {
         return;
     }
     auto fft_freqs = manager->getFFTFreqs();
@@ -70,16 +70,10 @@ void LRImager::resized() { setBounds(0, 0, getWidth(), getHeight()); };
 void LRImager::timerCallback() {
     if (is_next_block_drawable) {
         is_next_block_drawable = false;
-        draw();
+        getDataForPaint();
         repaint();
         is_next_block_drawable = true;
     }
 };
 
-void LRImager::draw() {
-    manager->calculatePowerSpectrum();
-    manager->calculateEnergyDifference();
-    fft_data = manager->getFFTResult();
-    power_spectrum = manager->getPowerSpectrum();
-    energy_difference = manager->getEnergyDifference();
-};
+void LRImager::getDataForPaint() { fft_data = manager->getFFTResult(); };

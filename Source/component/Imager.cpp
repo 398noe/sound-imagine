@@ -7,89 +7,17 @@ Imager::Imager(std::shared_ptr<Manager> data) : manager(data) {
 
 Imager::~Imager() { stopTimer(); }
 
-void Imager::paint(juce::Graphics &g) {
-    g.fillAll(juce::Colours::black);
-    if (fft_data.empty() || power_spectrum.empty() || energy_difference.empty()) {
-        return;
-    }
-
-    auto width = getWidth();
-    auto height = getHeight();
-    auto bin_width = (float)height / FFTConstants::FFT_LENGTH;
-    double sr = manager->getSampleRate();
-    double nyquist = sr / 2.0;
-
-    float center_x = (float)width / 2.0f;
-
-    // 真ん中に白い線を引く
-    g.setColour(juce::Colours::white);
-    g.drawLine(center_x, 0, center_x, height, 1.0f);
-
-    g.setColour(juce::Colours::green);
-    for (size_t i = 0; i < FFTConstants::FFT_LENGTH; i++) { // 下から上に向かってドットを描画する
-        auto hz = i * nyquist / (FFTConstants::FFT_SIZE >> 1);
-        auto y = (std::log(i + 1.0) / std::log(FFTConstants::FFT_LENGTH)) * height;
-        // auto skewed_y = 1.0f - std::exp(std::log(1.0f - (float)i / FFTConstants::FFT_LENGTH) * 0.2f); // 対数的にy座標を変化させる
-        // auto y = skewed_y * height;
-        // auto y = i * bin_width;
-        auto left = power_spectrum[0][i];
-        auto right = power_spectrum[1][i];
-        auto left_x = juce::jmap(left, 0.0f, 100.0f, center_x, 0.0f);
-        auto right_x = juce::jmap(right, 0.0f, 100.0f, center_x, (float)width);
-
-        juce::Colour bar_color = juce::Colour::fromFloatRGBA(1.0f, 1.0f, 1.0f, 0.2f);
-        g.setColour(bar_color);
-        g.drawLine(left_x, height - y, right_x, height - y, 2.0f);
-
-        auto power = (left + right) * 0.5f;
-
-        juce::Colour color = juce::Colour::fromFloatRGBA(1.0f, 0.0f, 0.0f, juce::jmap(power, 0.0f, 10.0f, 0.5f, 1.0f));
-
-        auto diff = energy_difference[0][i];
-        auto offset = juce::jmap(diff, -50.0f, 50.0f, -0.5f, 0.5f);
-
-        auto dotX = (1 + 2.0f * offset) * center_x;
-        auto dotY = height - y;
-
-        g.setColour(color);
-        g.fillEllipse(dotX, dotY, 4.0f, 4.0f);
-
-        if (i % 32 == 0) {
-            g.setColour(juce::Colours::white);
-            g.drawLine(center_x - 10.0f, dotY, center_x + 10.0f, dotY, 1.0f);
-            g.setFont(10.0f);
-            g.drawText(juce::String(hz, 1) + "Hz", center_x, dotY - 10, 50, 20, juce::Justification::centred, true);
-        }
-    }
-
-    // 31Hz, 62Hz, 125Hz, 250Hz, 500Hz, 1kHz, 2kHz, 4kHz, 8kHz, 16kHz のラインを引く
-    // 対数軸になっているので、等間隔になるように計算する
-    // for (int i = 0; i < 10; i++) {
-    //     int mul = std::pow(2, i);
-    //     auto hz = (float)mul * 31.25;
-    //     auto y = (std::log(hz) / std::log(manager->getSampleRate())) * height / 2;
-    //     g.setColour(juce::Colours::white);
-    //     g.drawLine(center_x - 10.0f, height - y, center_x + 10.0f, height - y, 1.0f);
-    //     g.setFont(10.0f);
-    //     g.drawText(juce::String(hz, 1) + "Hz", center_x, height - y - 10, 50, 20, juce::Justification::centred, true);
-    // }
-}
+void Imager::paint(juce::Graphics &g) {}
 
 void Imager::resized() { setBounds(0, 0, getWidth(), getHeight()); }
 
 void Imager::timerCallback() {
     if (this->is_next_block_drawable) {
         this->is_next_block_drawable = false;
-        drawFFTData();
+        getDataForPaint();
         this->is_next_block_drawable = true;
         repaint();
     }
 }
 
-void Imager::drawFFTData() {
-    manager->calculatePowerSpectrum();
-    manager->calculateEnergyDifference();
-    fft_data = manager->getFFTResult();
-    power_spectrum = manager->getPowerSpectrum();
-    energy_difference = manager->getEnergyDifference();
-}
+void Imager::getDataForPaint() { fft_data = manager->getFFTResult(); }

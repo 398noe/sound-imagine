@@ -13,14 +13,12 @@ class Imager : public juce::Component, private juce::Timer {
 
     void timerCallback() override;
 
-    void drawFFTData();
+    void getDataForPaint();
 
   private:
     bool is_next_block_drawable = true;
     std::shared_ptr<Manager> manager;
     std::array<float[FFTConstants::FFT_LENGTH], 4> fft_data = {0.0f};
-    std::array<float[FFTConstants::FFT_LENGTH], 4> power_spectrum = {0.0f};
-    std::array<float[FFTConstants::FFT_LENGTH], 2> energy_difference = {0.0f};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Imager)
 };

@@ -39,13 +39,14 @@ void LRImager::paint(juce::Graphics &g) {
         g.drawText(std::to_string(static_cast<int>(hz)), 0, y, 50, 20, juce::Justification::left);
     }
 
-    // LRのPower Spectrumを描画
-    for (size_t i = 0; i < FFTConstants::FFT_LENGTH; i++) {
+    // LRの振幅スペクトルを描画
+    for (int i = 0; i < FFTConstants::FFT_LENGTH; i++) {
         auto freq = fft_freqs[i];
         auto log = std::log10(freq);
-        auto left = power_spectrum[0][i];
-        auto right = power_spectrum[1][i];
-        auto diff = energy_difference[0][i];
+        auto left = fft_data[0][i];
+        auto right = fft_data[1][i];
+        auto diff = fft_data[0][i] - fft_data[1][i];
+        // auto diff = energy_difference[0][i];
         auto left_x = juce::jmap(left, 0.0f, 100.0f, center_x, 0.0f);
         auto right_x = juce::jmap(right, 0.0f, 100.0f, center_x, float(width));
         // 一番下が20Hz, 一番上が20kHzになるようにyの座標を決める。
@@ -54,11 +55,12 @@ void LRImager::paint(juce::Graphics &g) {
         g.setColour(juce::Colour::fromFloatRGBA(1.0f, 1.0f, 1.0f, 0.2f));
         g.drawLine(left_x, y, right_x, y, 2.0f);
 
-        auto power = (left + right) * 0.5f;
+        auto power = (left + right) * 0.5f; // means mid
         auto color = juce::Colour::fromFloatRGBA(0.0f, 1.0f, 0.0f, juce::jmap(power, 0.0f, 10.0f, 0.5f, 1.0f));
-        auto offset = juce::jmap(diff, -50.0f, 50.0f, -0.5f, 0.5f);
+        auto offset = juce::jmap(diff, -100.0f, 100.0f, -0.5f, 0.5f);
         auto dot_x = (1 + 2.0f * offset) * center_x;
         g.setColour(color);
+        // g.drawLine(dot_x, y, center_x, y, 2.0f);
         g.fillEllipse(dot_x - 2.0f, y - 2.0f, 4.0f, 4.0f);
     }
 };

@@ -12,6 +12,7 @@ class Processor {
     ~Processor();
 
     void doFFT();
+    void doCQT(const float sr, const float min, const int bins, const int octs);
     float *getFFTResult();
 
     void addAudioSample(float sample);

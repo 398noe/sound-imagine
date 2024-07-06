@@ -134,7 +134,8 @@ void SoundImagineAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, 
         from_last_fft++;
 
         if (from_last_fft >= FFTConstants::HOP_LENGTH) {
-            manager->calculateFFT();
+            // manager->calculateFFT();
+            manager->calculateCQT();
             manager->setFFTResult();
 
             from_last_fft = 0;

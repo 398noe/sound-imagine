@@ -10,6 +10,7 @@ class Manager {
     void addAudioSample(float sample, int channel);
     void addAudioSampleOnce(float left, float right);
     void calculateFFT();
+    void calculateCQT();
     void calculatePowerSpectrum();
     void calculateEnergyDifference();
     void setFFTResult();

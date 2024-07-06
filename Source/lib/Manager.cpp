@@ -10,6 +10,12 @@ void Manager::calculateFFT() {
     }
 }
 
+void Manager::calculateCQT() {
+    for (int i = 0; i < 4; i++) {
+        processor[i].doCQT(this->sample_rate, 32.703f, 24, 7);
+    }
+}
+
 void Manager::calculatePowerSpectrum() {
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < FFTConstants::FFT_LENGTH; j++) {

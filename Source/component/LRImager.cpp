@@ -47,8 +47,8 @@ void LRImager::paint(juce::Graphics &g) {
         auto right = fft_data[1][i];
         auto diff = fft_data[1][i] - fft_data[0][i];
         // auto diff = energy_difference[0][i];
-        auto left_x = juce::jmap(left, 0.0f, 100.0f, center_x, 0.0f);
-        auto right_x = juce::jmap(right, 0.0f, 100.0f, center_x, float(width));
+        auto left_x = juce::jmap(left, 0.0f, 50.0f, center_x, 0.0f);
+        auto right_x = juce::jmap(right, 0.0f, 50.0f, center_x, float(width));
         // 一番下が20Hz, 一番上が20kHzになるようにyの座標を決める。
         // fft_freqsがそれ以外の範囲を持つ場合があるが, その場合はウィンドウの外に描画する
         auto y = height - (log - 1.30103f) / 3.0f * height;
@@ -57,7 +57,7 @@ void LRImager::paint(juce::Graphics &g) {
 
         auto power = (left + right) * 0.5f; // means mid
         auto color = juce::Colour::fromFloatRGBA(0.0f, 1.0f, 0.0f, juce::jmap(power, 0.0f, 10.0f, 0.5f, 1.0f));
-        auto offset = juce::jmap(diff, -100.0f, 100.0f, -0.5f, 0.5f);
+        auto offset = juce::jmap(diff, -50.0f, 50.0f, -0.5f, 0.5f);
         auto dot_x = (1 + 2.0f * offset) * center_x;
         g.setColour(color);
         g.drawLine(dot_x, y, center_x, y, 4.0f);

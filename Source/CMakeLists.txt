@@ -1,7 +1,7 @@
 juce_add_plugin("${PROJECT_NAME}"
     FORMATS VST3 Standalone
     PRODUCT_NAME "SoundImagine"
-    COMPANY_NAME "TechProject"
+    COMPANY_NAME "SakyubaNoe"
     COMPANY_WEBSITE "https://github.com/398noe"
 
     PLUGIN_MANUFACTURER_CODE Nyao

@@ -21,6 +21,8 @@ juce_add_plugin("${PROJECT_NAME}"
 juce_generate_juce_header(${PROJECT_NAME})
 
 set(SHADER_FILES
+    shader/vertex.glsl
+    shader/fragment.glsl
 )
 
 target_sources(${PROJECT_NAME}
@@ -42,7 +44,7 @@ target_sources(${PROJECT_NAME}
         include/component/Imager.h
         include/component/LRImager.h
         include/component/ThreeImager.h
-        # ${SHADER_FILES}
+        ${SHADER_FILES}
 )
 
 target_include_directories("${PROJECT_NAME}"

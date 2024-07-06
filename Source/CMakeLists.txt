@@ -20,6 +20,9 @@ juce_add_plugin("${PROJECT_NAME}"
 
 juce_generate_juce_header(${PROJECT_NAME})
 
+set(SHADER_FILES
+)
+
 target_sources(${PROJECT_NAME}
     PRIVATE
         lib/AudioUtilities.cpp
@@ -37,6 +40,7 @@ target_sources(${PROJECT_NAME}
         include/PluginEditor.h
         include/component/Imager.h
         include/component/LRImager.h
+        # ${SHADER_FILES}
 )
 
 target_include_directories("${PROJECT_NAME}"
@@ -60,6 +64,7 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
         juce::juce_audio_utils
         juce::juce_dsp
+        juce::juce_opengl
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags

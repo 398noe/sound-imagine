@@ -26,6 +26,7 @@ target_sources(${PROJECT_NAME}
         lib/Manager.cpp
         lib/Processor.cpp
         component/Imager.cpp
+        component/LRImager.cpp
         PluginProcessor.cpp
         PluginEditor.cpp
         include/lib/AudioUtilities.h
@@ -35,6 +36,7 @@ target_sources(${PROJECT_NAME}
         include/PluginProcessor.h
         include/PluginEditor.h
         include/component/Imager.h
+        include/component/LRImager.h
 )
 
 target_include_directories("${PROJECT_NAME}"

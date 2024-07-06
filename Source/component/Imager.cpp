@@ -15,8 +15,9 @@ void Imager::paint(juce::Graphics &g) {
 
     auto width = getWidth();
     auto height = getHeight();
-    // auto bin_width = (float)height / FFTConstants::FFT_LENGTH;
-    double nyquist = manager->getSampleRate() / 2.0;
+    auto bin_width = (float)height / FFTConstants::FFT_LENGTH;
+    double sr = manager->getSampleRate();
+    double nyquist = sr / 2.0;
 
     float center_x = (float)width / 2.0f;
 
@@ -26,9 +27,11 @@ void Imager::paint(juce::Graphics &g) {
 
     g.setColour(juce::Colours::green);
     for (size_t i = 0; i < FFTConstants::FFT_LENGTH; i++) { // 下から上に向かってドットを描画する
-        auto skewed_y = 1.0f - std::exp(std::log(1.0f - (float)i / FFTConstants::FFT_LENGTH) * 0.2f); // 対数的にy座標を変化させる
-        auto hz = i * nyquist / FFTConstants::FFT_SIZE;
-        auto y = skewed_y * height;
+        auto hz = i * nyquist / (FFTConstants::FFT_SIZE >> 1);
+        auto y = (std::log(i + 1.0) / std::log(FFTConstants::FFT_LENGTH)) * height;
+        // auto skewed_y = 1.0f - std::exp(std::log(1.0f - (float)i / FFTConstants::FFT_LENGTH) * 0.2f); // 対数的にy座標を変化させる
+        // auto y = skewed_y * height;
+        // auto y = i * bin_width;
         auto left = power_spectrum[0][i];
         auto right = power_spectrum[1][i];
         auto left_x = juce::jmap(left, 0.0f, 100.0f, center_x, 0.0f);
@@ -55,9 +58,21 @@ void Imager::paint(juce::Graphics &g) {
             g.setColour(juce::Colours::white);
             g.drawLine(center_x - 10.0f, dotY, center_x + 10.0f, dotY, 1.0f);
             g.setFont(10.0f);
-            g.drawText(juce::String(hz, 1) + "Hz", center_x, dotY, 50, 20, juce::Justification::centred, true);
+            g.drawText(juce::String(hz, 1) + "Hz", center_x, dotY - 10, 50, 20, juce::Justification::centred, true);
         }
     }
+
+    // 31Hz, 62Hz, 125Hz, 250Hz, 500Hz, 1kHz, 2kHz, 4kHz, 8kHz, 16kHz のラインを引く
+    // 対数軸になっているので、等間隔になるように計算する
+    // for (int i = 0; i < 10; i++) {
+    //     int mul = std::pow(2, i);
+    //     auto hz = (float)mul * 31.25;
+    //     auto y = (std::log(hz) / std::log(manager->getSampleRate())) * height / 2;
+    //     g.setColour(juce::Colours::white);
+    //     g.drawLine(center_x - 10.0f, height - y, center_x + 10.0f, height - y, 1.0f);
+    //     g.setFont(10.0f);
+    //     g.drawText(juce::String(hz, 1) + "Hz", center_x, height - y - 10, 50, 20, juce::Justification::centred, true);
+    // }
 }
 
 void Imager::resized() { setBounds(0, 0, getWidth(), getHeight()); }

@@ -30,6 +30,7 @@ target_sources(${PROJECT_NAME}
         lib/Processor.cpp
         component/Imager.cpp
         component/LRImager.cpp
+        component/ThreeImager.cpp
         PluginProcessor.cpp
         PluginEditor.cpp
         include/lib/AudioUtilities.h
@@ -40,6 +41,7 @@ target_sources(${PROJECT_NAME}
         include/PluginEditor.h
         include/component/Imager.h
         include/component/LRImager.h
+        include/component/ThreeImager.h
         # ${SHADER_FILES}
 )
 

@@ -10,7 +10,7 @@ ThreeImager::ThreeImager(std::shared_ptr<Manager> data) : manager(data) {
     if (juce::ComponentPeer *peer = getPeer()) {
         peer->setCurrentRenderingEngine(0);
     }
-    _context.setOpenGLVersionRequired(juce::OpenGLContext::openGL4_3);
+    _context.setOpenGLVersionRequired(juce::OpenGLContext::openGL3_2);
     _context.setRenderer(this);
     _context.attachTo(*this); // or attachTo(*getTopLevelComponent())
     _context.setContinuousRepainting(true);
@@ -119,7 +119,9 @@ void ThreeImager::getDataForPaint() {
     fft_freq = manager->getFFTFreqs();
 }
 
-void ThreeImager::newOpenGLContextCreated() {}
+void ThreeImager::newOpenGLContextCreated() {
+    shader.reset();
+}
 
 void ThreeImager::createShader() {
     vertex_shader = juce::String(R"(
@@ -138,8 +140,8 @@ void ThreeImager::createShader() {
     )");
 
     std::unique_ptr<juce::OpenGLShaderProgram> new_shader(new juce::OpenGLShaderProgram(_context));
-    new_shader->addVertexShader(this->vertex_shader);
-    new_shader->addFragmentShader(this->fragment_shader);
+    new_shader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(this->vertex_shader));
+    new_shader->addFragmentShader(juce::OpenGLHelpers::translateFragmentShaderToV3(this->fragment_shader));
     new_shader->link();
 
     shader = std::move(new_shader);

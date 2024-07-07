@@ -5,17 +5,18 @@ ThreeImager::ThreeImager(std::shared_ptr<Manager> data) : manager(data) {
     startTimerHz(60);
     setSize(800, 600);
 
-    // initialize shader
-    shader = loadShader(VERTEX_SHADER_PATH, FRAGMENT_SHADER_PATH);
-    projection_matrix_location = juce::gl::glGetUniformLocation(shader, "projectionMatrix");
-    view_matrix_location = juce::gl::glGetUniformLocation(shader, "viewMatrix");
-    position_attribute = juce::gl::glGetAttribLocation(shader, "position");
+#if JUCE_OPENGL
+    _context.setRenderer(this);
+    _context.setMultisamplingEnabled(true);
+    _context.attachTo(*getTopLevelComponent());
+
+    if (juce::ComponentPeer *peer = getPeer()) {
+        peer->setCurrentRenderingEngine(0);
+    }
+#endif
 }
 
-ThreeImager::~ThreeImager() {
-    stopTimer();
-    juce::gl::glDeleteProgram(shader);
-}
+ThreeImager::~ThreeImager() { stopTimer(); }
 
 void ThreeImager::paint(juce::Graphics &g) {}
 
@@ -31,3 +32,9 @@ void ThreeImager::timerCallback() {
 }
 
 void ThreeImager::getDataForPaint() { fft_data = manager->getFFTResult(); }
+
+void ThreeImager::newOpenGLContextCreated() {}
+
+void ThreeImager::renderOpenGL() {}
+
+void ThreeImager::openGLContextClosing() {}

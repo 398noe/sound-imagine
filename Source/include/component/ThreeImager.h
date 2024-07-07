@@ -38,7 +38,8 @@ class ThreeImager : public juce::Component, private juce::Timer, public juce::Op
     std::array<float, FFTConstants::FFT_LENGTH> fft_freq = {0.0f};
 
     juce::OpenGLContext _context;
-    std::unique_ptr<juce::OpenGLGraphicsContextCustomShader> shader;
+    std::unique_ptr<juce::OpenGLShaderProgram> shader;
+
     GLuint shader_program;
     GLint projection_matrix_location;
     GLint view_matrix_location;
@@ -52,6 +53,8 @@ class ThreeImager : public juce::Component, private juce::Timer, public juce::Op
     juce::Draggable3DOrientation orientation;
     float rotation = 0.0f;
     float scale = 0.5f;
+
+    juce::Rectangle<int> bounds;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ThreeImager)
 };

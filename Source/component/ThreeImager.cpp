@@ -18,20 +18,11 @@ ThreeImager::ThreeImager(std::shared_ptr<Manager> data) : manager(data) {
     // set shaders
     createShader();
 #endif
-
-    // shader_program = _context.extensions.glCreateProgram();
-    // _context.
-    // // juce::OpenGLShaderProgram::addVertexShader(shader_program, Shader::vertex_shader);
-    // juce::OpenGLShaderProgram::addFragmentShader(shader_program, Shader::fragment_shader);
-    // juce::OpenGLShaderProgram::link(shader_program);
-
-    // projection_matrix_location = _context.extensions.glGetUniformLocation(shader_program, "projectionMatrix");
-    // view_matrix_location = _context.extensions.glGetUniformLocation(shader_program, "viewMatrix");
-    // position_attribute = _context.extensions.glGetAttribLocation(shader_program, "position");
 }
 
 ThreeImager::~ThreeImager() {
     stopTimer();
+    shader.reset();
     _context.detach();
 }
 
@@ -41,7 +32,7 @@ void ThreeImager::renderOpenGL() {
     const juce::ScopedLock lock(std::mutex);
     jassert(juce::OpenGLHelpers::isContextActive());
 
-    auto desktopScale = (float)_context.getRenderingScale();
+    auto desktop_scale = (float)_context.getRenderingScale();
 
     juce::OpenGLHelpers::clear(juce::Colours::black);
 
@@ -59,15 +50,25 @@ void ThreeImager::renderOpenGL() {
         juce::gl::glEnable(juce::gl::GL_TEXTURE_2D);
     }
 
-    juce::gl::glViewport(0, 0, juce::roundToInt(desktopScale * getWidth()), juce::roundToInt(desktopScale * getHeight()));
+    {
+        const juce::ScopedLock lock(std::mutex);
+        juce::gl::glViewport(0, 0, juce::roundToInt(desktop_scale * getWidth()), juce::roundToInt(desktop_scale * getHeight()));
+    }
 
-    _context.extensions.glUseProgram(shader_program);
+    shader->use();
 
+    // reset element buffers
+    juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, 0);
+    juce::gl::glBindBuffer(juce::gl::GL_ELEMENT_ARRAY_BUFFER, 0);
+
+    // 描画する座標と視点を設定
     juce::Matrix3D<float> projection_matrix = juce::Matrix3D<float>::fromFrustum(-1.0f, 1.0f, -1.0f, 1.0f, 1.0f, 100.0f);
     juce::Matrix3D<float> view_matrix = juce::Matrix3D<float>::fromTranslation({0.0f, 0.0f, -5.0f});
+
     _context.extensions.glUniformMatrix4fv(projection_matrix_location, 1, juce::gl::GL_FALSE, projection_matrix.mat);
     _context.extensions.glUniformMatrix4fv(view_matrix_location, 1, juce::gl::GL_FALSE, view_matrix.mat);
 
+    // 点群を描画する
     for (int i = 0; i < FFTConstants::FFT_LENGTH; ++i) {
         float x = fft_data[3][i];
         float y = fft_data[2][i];
@@ -77,7 +78,7 @@ void ThreeImager::renderOpenGL() {
         _context.extensions.glVertexAttribPointer(position_attribute, 3, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, 0, vertices);
         _context.extensions.glEnableVertexAttribArray(position_attribute);
 
-        // _context.extensions.glDrawArrays(juce::gl::GL_POINTS, 0, 1);
+        juce::gl::glDrawArrays(juce::gl::GL_POINTS, 0, 1);
     }
 }
 
@@ -98,7 +99,11 @@ juce::Matrix3D<float> ThreeImager::getViewMatrix() {
 
 void ThreeImager::paint(juce::Graphics &) {}
 
-void ThreeImager::resized() { setBounds(0, 0, getWidth(), getHeight()); }
+void ThreeImager::resized() {
+    const juce::ScopedLock lock(std::mutex);
+    bounds = getLocalBounds();
+    // setBounds(0, 0, getWidth(), getHeight());
+}
 
 void ThreeImager::timerCallback() {
     if (is_next_block_drawable) {
@@ -131,6 +136,14 @@ void ThreeImager::createShader() {
             gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
         }
     )");
+
+    std::unique_ptr<juce::OpenGLShaderProgram> new_shader(new juce::OpenGLShaderProgram(_context));
+    new_shader->addVertexShader(vertex_shader);
+    new_shader->addFragmentShader(fragment_shader);
+    new_shader->link();
+
+    shader = std::move(new_shader);
+    shader->use();
 }
 
 void ThreeImager::mouseDrag(const juce::MouseEvent &e) {}

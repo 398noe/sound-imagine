@@ -20,6 +20,8 @@ class GLTest : public juce::Component, public juce::OpenGLRenderer, private juce
     void mouseWheelMove(const juce::MouseEvent &e, const juce::MouseWheelDetails &wheel) override;
 
     void updateProjectionMatrix();
+    juce::Matrix3D<float> createLookAtMatrix(const juce::Vector3D<float> &eye, const juce::Vector3D<float> &center,
+                                             const juce::Vector3D<float> &up);
 
   private:
     std::vector<OpenGLShader::Vertex> vertices;

@@ -135,16 +135,13 @@ void GLTest::mouseDrag(const juce::MouseEvent &e) {
     yaw += delta_x * 0.001f;
     pitch += delta_y * 0.001f;
 
-    pitch = juce::jlimit(-juce::MathConstants<float>::halfPi, juce::MathConstants<float>::halfPi, pitch);
+    // pitch = juce::jlimit(-juce::MathConstants<float>::halfPi, juce::MathConstants<float>::halfPi, pitch);
 
     float radius = 5.0f;
     camera_position.x = radius * std::cos(yaw) * std::cos(pitch);
     camera_position.y = radius * std::sin(pitch);
     camera_position.z = radius * std::sin(yaw) * std::cos(pitch);
 
-    // repaint();
-    // rotation.x += e.getDistanceFromDragStartX() * 0.001f;
-    // rotation.y += e.getDistanceFromDragStartY() * 0.001f;
     updateProjectionMatrix();
     repaint();
 }
@@ -156,12 +153,47 @@ void GLTest::mouseWheelMove(const juce::MouseEvent &e, const juce::MouseWheelDet
     repaint();
 }
 
+juce::Vector3D<float> cross(const juce::Vector3D<float> &a, const juce::Vector3D<float> &b) {
+    return juce::Vector3D<float>(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+}
+
+// ドット積を計算する関数
+float dot(const juce::Vector3D<float> &a, const juce::Vector3D<float> &b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+
+// lookAt行列を作成する関数
+juce::Matrix3D<float> GLTest::createLookAtMatrix(const juce::Vector3D<float> &eye, const juce::Vector3D<float> &center,
+                                                 const juce::Vector3D<float> &up) {
+    juce::Vector3D<float> f = (center - eye).normalised();
+    juce::Vector3D<float> s = cross(f, up).normalised();
+    juce::Vector3D<float> u = cross(s, f);
+
+    juce::Matrix3D<float> result;
+    result.mat[0] = s.x;
+    result.mat[4] = s.y;
+    result.mat[8] = s.z;
+    result.mat[12] = -dot(s, eye);
+    result.mat[1] = u.x;
+    result.mat[5] = u.y;
+    result.mat[9] = u.z;
+    result.mat[13] = -dot(u, eye);
+    result.mat[2] = -f.x;
+    result.mat[6] = -f.y;
+    result.mat[10] = -f.z;
+    result.mat[14] = dot(f, eye);
+    result.mat[3] = 0.0f;
+    result.mat[7] = 0.0f;
+    result.mat[11] = 0.0f;
+    result.mat[15] = 1.0f;
+
+    return result;
+}
+
 void GLTest::updateProjectionMatrix() {
     auto aspect = (float)getWidth() / (float)getHeight();
     projection_matrix = juce::Matrix3D<float>::fromFrustum(-aspect, aspect, -1.0f, 1.0f, 1.0f, 100.0f);
     view_matrix = juce::Matrix3D<float>::fromTranslation(juce::Vector3D<float>(0.0f, 0.0f, -5.0f / zoom));
-    // model_matrix = juce::Matrix3D<float>::lookAt(camera_position, juce::Vector3D<float>(0.0f, 0.0f, 0.0f), juce::Vector3D<float>(0.0f, 1.0f, 0.0f));
-    model_matrix = juce::Matrix3D<float>::rotation(juce::Vector3D<float>(camera_position.x, camera_position.y, camera_position.z));
+    model_matrix = createLookAtMatrix(camera_position, juce::Vector3D<float>(0.0f, 0.0f, 0.0f), juce::Vector3D<float>(0.0f, 1.0f, 0.0f));
+    // model_matrix = juce::Matrix3D<float>::rotation(juce::Vector3D<float>(camera_position.x, camera_position.y, camera_position.z));
 }
 
 void GLTest::resized() { updateProjectionMatrix(); }

@@ -5,7 +5,7 @@
 #include "lib/Manager.h"
 #include "lib/Shader.h"
 
-class ThreeImager : public juce::Component, private juce::Timer, public juce::OpenGLRenderer {
+class ThreeImager : public juce::Component, private juce::Timer, private juce::OpenGLRenderer, private juce::AsyncUpdater {
   public:
     ThreeImager(std::shared_ptr<Manager> data);
     ~ThreeImager() override;
@@ -15,10 +15,12 @@ class ThreeImager : public juce::Component, private juce::Timer, public juce::Op
 
     void timerCallback() override;
 
+    // OpenGL
     void newOpenGLContextCreated() override;
     void renderOpenGL() override;
     void openGLContextClosing() override;
 
+    juce::Matrix3D<float> getViewMatrix();
     void getDataForPaint();
 
   private:
@@ -28,10 +30,16 @@ class ThreeImager : public juce::Component, private juce::Timer, public juce::Op
     std::array<float, FFTConstants::FFT_LENGTH> fft_freq = {0.0f};
 
     juce::OpenGLContext _context;
-    GLuint shader;
+    std::unique_ptr<juce::OpenGLGraphicsContextCustomShader> shader;
+    GLuint shader_program;
     GLint projection_matrix_location;
     GLint view_matrix_location;
     GLint position_attribute;
+
+    // opengl view rotation
+    juce::Draggable3DOrientation orientation;
+    float rotation = 0.0f;
+    float scale = 0.5f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ThreeImager)
 };

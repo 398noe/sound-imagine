@@ -23,9 +23,7 @@ ThreeImager::~ThreeImager() {
 
 void ThreeImager::openGLContextClosing() { shader.reset(); }
 
-void ThreeImager::resized() {
-    setBounds(0, 0, getWidth(), getHeight());
-}
+void ThreeImager::resized() { setBounds(0, 0, getWidth(), getHeight()); }
 
 void ThreeImager::timerCallback() {
     if (is_next_block_drawable) {
@@ -53,8 +51,8 @@ void ThreeImager::newOpenGLContextCreated() {
 
     point_cloud = {
         {{0.5f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}}, // Red
-        {{0.0f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},  // Green
-        {{0.0f, 0.0f, 0.5f}, {0.0f, 0.0f, 1.0f, 1.0f}},   // Blue
+        {{0.0f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}}, // Green
+        {{0.0f, 0.0f, 0.5f}, {0.0f, 0.0f, 1.0f, 1.0f}}, // Blue
     };
 
     index_buffer = {0, 1, 2};

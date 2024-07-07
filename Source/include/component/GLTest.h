@@ -30,7 +30,11 @@ class GLTest : public juce::Component, public juce::OpenGLRenderer, private juce
     juce::Matrix3D<float> projection_matrix;
     juce::Matrix3D<float> view_matrix;
     juce::Matrix3D<float> model_matrix;
+
     float zoom = 2.0f;
+    float yaw = 0.0f;
+    float pitch = 0.0f;
+    juce::Vector3D<float> camera_position;
     juce::Vector3D<float> rotation;
 
     GLuint vbo;

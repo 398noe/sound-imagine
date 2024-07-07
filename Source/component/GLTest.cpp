@@ -129,8 +129,22 @@ void GLTest::renderOpenGL() {
 void GLTest::mouseDown(const juce::MouseEvent &e) {}
 
 void GLTest::mouseDrag(const juce::MouseEvent &e) {
-    rotation.x += e.getDistanceFromDragStartX() * 0.001f;
-    rotation.y += e.getDistanceFromDragStartY() * 0.001f;
+    auto delta_x = e.getDistanceFromDragStartX();
+    auto delta_y = e.getDistanceFromDragStartY();
+
+    yaw += delta_x * 0.001f;
+    pitch += delta_y * 0.001f;
+
+    pitch = juce::jlimit(-juce::MathConstants<float>::halfPi, juce::MathConstants<float>::halfPi, pitch);
+
+    float radius = 5.0f;
+    camera_position.x = radius * std::cos(yaw) * std::cos(pitch);
+    camera_position.y = radius * std::sin(pitch);
+    camera_position.z = radius * std::sin(yaw) * std::cos(pitch);
+
+    // repaint();
+    // rotation.x += e.getDistanceFromDragStartX() * 0.001f;
+    // rotation.y += e.getDistanceFromDragStartY() * 0.001f;
     updateProjectionMatrix();
     repaint();
 }
@@ -146,7 +160,8 @@ void GLTest::updateProjectionMatrix() {
     auto aspect = (float)getWidth() / (float)getHeight();
     projection_matrix = juce::Matrix3D<float>::fromFrustum(-aspect, aspect, -1.0f, 1.0f, 1.0f, 100.0f);
     view_matrix = juce::Matrix3D<float>::fromTranslation(juce::Vector3D<float>(0.0f, 0.0f, -5.0f / zoom));
-    model_matrix = juce::Matrix3D<float>::rotation(juce::Vector3D<float>(rotation.x, rotation.y, rotation.z));
+    // model_matrix = juce::Matrix3D<float>::lookAt(camera_position, juce::Vector3D<float>(0.0f, 0.0f, 0.0f), juce::Vector3D<float>(0.0f, 1.0f, 0.0f));
+    model_matrix = juce::Matrix3D<float>::rotation(juce::Vector3D<float>(camera_position.x, camera_position.y, camera_position.z));
 }
 
 void GLTest::resized() { updateProjectionMatrix(); }

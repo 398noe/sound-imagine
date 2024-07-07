@@ -16,6 +16,7 @@ class GLTest : public juce::Component, public juce::OpenGLRenderer, private juce
 
   private:
     std::vector<OpenGLShader::Vertex> vertices;
+    std::vector<OpenGLShader::Vertex> axis;
     // std::vector<unsigned int> index_buffer;
 
     GLuint vbo;

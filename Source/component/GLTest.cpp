@@ -21,20 +21,27 @@ void GLTest::newOpenGLContextCreated() {
     _context.extensions.glGenBuffers(1, &vbo);
     // _context.extensions.glGenBuffers(1, &ibo);
 
+    // set axis
+    axis = {{{-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},                                                  // X軸
+            {{1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},  {{0.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}}, // Y軸
+            {{0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},  {{0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}, // Z軸
+            {{0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
+
+    // set vertices
     vertices = {{{0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
                 {{0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
                 {{-0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
                 {{0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
 
-    // index_buffer = {0, 1, 2, 3};
-
     _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
-    _context.extensions.glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * vertices.size(), vertices.data(),
+    _context.extensions.glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * (vertices.size() + axis.size()), nullptr,
                                      juce::gl::GL_STATIC_DRAW);
-
-    // _context.extensions.glBindBuffer(juce::gl::GL_ELEMENT_ARRAY_BUFFER, ibo);
-    // _context.extensions.glBufferData(juce::gl::GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * index_buffer.size(), index_buffer.data(),
-    //                                  juce::gl::GL_STATIC_DRAW);
+    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, 0, sizeof(OpenGLShader::Vertex) * axis.size(),
+                                        axis.data()); // 軸の描画に使用するバッファ, 視点変更によって変更されることはあるのだろうか。
+    _context.extensions.glBufferSubData(
+        juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * axis.size(), sizeof(OpenGLShader::Vertex) * vertices.size(),
+        vertices
+            .data()); // このバッファは頂点データを保持するが、今後FFTの結果を保持するバッファに変更するため、可変的に変更することになる。
 
     vertex_shader = R"(
         #version 330 core
@@ -89,8 +96,11 @@ void GLTest::renderOpenGL() {
     // 点のサイズを設定 (例: 5.0f)
     juce::gl::glPointSize(5.0f);
 
+    // X, Y, Z軸を描画
+    juce::gl::glDrawArrays(juce::gl::GL_LINES, 0, axis.size());
+
     // GL_POINTSモードで点を描画
-    juce::gl::glDrawArrays(juce::gl::GL_POINTS, 0, vertices.size());
+    juce::gl::glDrawArrays(juce::gl::GL_POINTS, axis.size(), vertices.size());
 
     attributes.disable();
 }

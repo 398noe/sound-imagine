@@ -19,22 +19,22 @@ GLTest::~GLTest() {
 
 void GLTest::newOpenGLContextCreated() {
     _context.extensions.glGenBuffers(1, &vbo);
-    _context.extensions.glGenBuffers(1, &ibo);
+    // _context.extensions.glGenBuffers(1, &ibo);
 
-    vertices = {{{0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
-                {{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
-                {{1.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}},
-                {{0.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f, 1.0f}}};
+    vertices = {{{0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
+                {{0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
+                {{-0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
+                {{0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
 
-    index_buffer = {0, 1, 2, 3};
+    // index_buffer = {0, 1, 2, 3};
 
     _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
     _context.extensions.glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * vertices.size(), vertices.data(),
                                      juce::gl::GL_STATIC_DRAW);
 
-    _context.extensions.glBindBuffer(juce::gl::GL_ELEMENT_ARRAY_BUFFER, ibo);
-    _context.extensions.glBufferData(juce::gl::GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * index_buffer.size(), index_buffer.data(),
-                                     juce::gl::GL_STATIC_DRAW);
+    // _context.extensions.glBindBuffer(juce::gl::GL_ELEMENT_ARRAY_BUFFER, ibo);
+    // _context.extensions.glBufferData(juce::gl::GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * index_buffer.size(), index_buffer.data(),
+    //                                  juce::gl::GL_STATIC_DRAW);
 
     vertex_shader = R"(
         #version 330 core
@@ -77,7 +77,7 @@ void GLTest::renderOpenGL() {
     attributes.enable();
 
     _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
-    _context.extensions.glBindBuffer(juce::gl::GL_ELEMENT_ARRAY_BUFFER, ibo);
+    // _context.extensions.glBindBuffer(juce::gl::GL_ELEMENT_ARRAY_BUFFER, ibo);
 
     _context.extensions.glVertexAttribPointer(0, 3, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, sizeof(OpenGLShader::Vertex), nullptr);
     _context.extensions.glEnableVertexAttribArray(0);
@@ -86,6 +86,10 @@ void GLTest::renderOpenGL() {
                                               (GLvoid *)(sizeof(float) * 3));
     _context.extensions.glEnableVertexAttribArray(1);
 
+    // 点のサイズを設定 (例: 5.0f)
+    juce::gl::glPointSize(5.0f);
+
+    // GL_POINTSモードで点を描画
     juce::gl::glDrawArrays(juce::gl::GL_POINTS, 0, vertices.size());
 
     attributes.disable();

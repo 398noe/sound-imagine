@@ -25,7 +25,6 @@ target_sources(${PROJECT_NAME}
         lib/AudioUtilities.cpp
         lib/Manager.cpp
         lib/Processor.cpp
-        lib/Shader.cpp
         component/Imager.cpp
         component/LRImager.cpp
         component/ThreeImager.cpp

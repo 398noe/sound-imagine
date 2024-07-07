@@ -5,7 +5,7 @@
 #include "lib/Manager.h"
 #include "lib/Shader.h"
 
-class ThreeImager : public juce::Component, private juce::Timer, private juce::OpenGLRenderer, private juce::AsyncUpdater {
+class ThreeImager : public juce::Component, private juce::Timer, public juce::OpenGLRenderer {
   public:
     ThreeImager(std::shared_ptr<Manager> data);
     ~ThreeImager() override;
@@ -22,6 +22,8 @@ class ThreeImager : public juce::Component, private juce::Timer, private juce::O
 
     juce::Matrix3D<float> getViewMatrix();
     void getDataForPaint();
+
+    void createShaders();
 
     // mouse / wheel events
     void mouseDrag(const juce::MouseEvent &e) override;

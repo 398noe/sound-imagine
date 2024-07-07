@@ -14,6 +14,9 @@ ThreeImager::ThreeImager(std::shared_ptr<Manager> data) : manager(data) {
     _context.setRenderer(this);
     _context.attachTo(*this); // or attachTo(*getTopLevelComponent())
     _context.setContinuousRepainting(true);
+
+    // set shaders
+    createShaders();
 #endif
 
     // shader_program = _context.extensions.glCreateProgram();
@@ -105,3 +108,20 @@ void ThreeImager::getDataForPaint() {
 }
 
 void ThreeImager::newOpenGLContextCreated() {}
+
+void ThreeImager::createShaders() {
+    vertex_shader = R"(
+        attribute vec3 position;
+        uniform mat4 projectionMatrix;
+        uniform mat4 viewMatrix;
+        void main() {
+            gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
+        }
+    )";
+
+    fragment_shader = R"(
+        void main() {
+            gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+        }
+    )";
+}

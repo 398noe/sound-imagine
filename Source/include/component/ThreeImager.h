@@ -40,7 +40,6 @@ class ThreeImager : public juce::Component, private juce::Timer, public juce::Op
     juce::OpenGLContext _context;
     std::unique_ptr<juce::OpenGLShaderProgram> shader;
 
-    GLuint shader_program;
     GLint projection_matrix_location;
     GLint view_matrix_location;
     GLint position_attribute;

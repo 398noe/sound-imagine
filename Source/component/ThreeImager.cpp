@@ -138,8 +138,8 @@ void ThreeImager::createShader() {
     )");
 
     std::unique_ptr<juce::OpenGLShaderProgram> new_shader(new juce::OpenGLShaderProgram(_context));
-    new_shader->addVertexShader(vertex_shader);
-    new_shader->addFragmentShader(fragment_shader);
+    new_shader->addVertexShader(this->vertex_shader);
+    new_shader->addFragmentShader(this->fragment_shader);
     new_shader->link();
 
     shader = std::move(new_shader);

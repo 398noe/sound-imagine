@@ -23,6 +23,10 @@ class ThreeImager : public juce::Component, private juce::Timer, private juce::O
     juce::Matrix3D<float> getViewMatrix();
     void getDataForPaint();
 
+    // mouse / wheel events
+    void mouseDrag(const juce::MouseEvent &e) override;
+    void mouseWheelMove(const juce::MouseEvent &e, const juce::MouseWheelDetails &d) override;
+
   private:
     bool is_next_block_drawable = true;
     std::shared_ptr<Manager> manager;
@@ -35,6 +39,10 @@ class ThreeImager : public juce::Component, private juce::Timer, private juce::O
     GLint projection_matrix_location;
     GLint view_matrix_location;
     GLint position_attribute;
+
+    // opengl shader
+    juce::String vertex_shader;
+    juce::String fragment_shader;
 
     // opengl view rotation
     juce::Draggable3DOrientation orientation;

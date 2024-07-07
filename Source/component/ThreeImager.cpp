@@ -55,26 +55,13 @@ void ThreeImager::renderOpenGL() {
     if (!_context.isCoreProfile()) {
         juce::gl::glEnable(juce::gl::GL_TEXTURE_2D);
     }
-}
 
-juce::Matrix3D<float> ThreeImager::getViewMatrix() {
-    const juce::ScopedLock lock(std::mutex);
-    auto view_matrix = juce::Matrix3D<float>::fromTranslation({0.0f, 0.0f, -5.0f}) * orientation.getRotationMatrix();
-    auto rotation_matrix = juce::Matrix3D<float>::rotation({rotation, rotation, -0.3f});
-
-    return view_matrix * rotation_matrix;
-}
-
-void ThreeImager::paint(juce::Graphics &g) {
-    // g.fillCheckerBoard(getLocalBounds().toFloat(), 48.0f, 48.0f, juce::Colours::black, juce::Colours::darkgrey);
-
-    juce::OpenGLHelpers::clear(juce::Colours::black);
+    juce::gl::glViewport(0, 0, juce::roundToInt(desktopScale * getWidth()), juce::roundToInt(desktopScale * getHeight()));
 
     _context.extensions.glUseProgram(shader_program);
 
     juce::Matrix3D<float> projection_matrix = juce::Matrix3D<float>::fromFrustum(-1.0f, 1.0f, -1.0f, 1.0f, 1.0f, 100.0f);
     juce::Matrix3D<float> view_matrix = juce::Matrix3D<float>::fromTranslation({0.0f, 0.0f, -5.0f});
-
     _context.extensions.glUniformMatrix4fv(projection_matrix_location, 1, juce::gl::GL_FALSE, projection_matrix.mat);
     _context.extensions.glUniformMatrix4fv(view_matrix_location, 1, juce::gl::GL_FALSE, view_matrix.mat);
 
@@ -87,9 +74,19 @@ void ThreeImager::paint(juce::Graphics &g) {
         _context.extensions.glVertexAttribPointer(position_attribute, 3, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, 0, vertices);
         _context.extensions.glEnableVertexAttribArray(position_attribute);
 
-        _context.extensions.glDrawArrays(juce::gl::GL_POINTS, 0, 1);
+        // _context.extensions.glDrawArrays(juce::gl::GL_POINTS, 0, 1);
     }
 }
+
+juce::Matrix3D<float> ThreeImager::getViewMatrix() {
+    const juce::ScopedLock lock(std::mutex);
+    auto view_matrix = juce::Matrix3D<float>::fromTranslation({0.0f, 0.0f, -5.0f}) * orientation.getRotationMatrix();
+    auto rotation_matrix = juce::Matrix3D<float>::rotation({rotation, rotation, -0.3f});
+
+    return view_matrix * rotation_matrix;
+}
+
+void ThreeImager::paint(juce::Graphics &) {}
 
 void ThreeImager::resized() { setBounds(0, 0, getWidth(), getHeight()); }
 

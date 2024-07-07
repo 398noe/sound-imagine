@@ -22,16 +22,15 @@ class ThreeImager : public juce::Component, private juce::Timer, public juce::Op
 
     juce::Matrix3D<float> getProjectionMatrix();
     juce::Matrix3D<float> getViewMatrix();
-    void getDataForPaint();
 
-    void createShader();
-    void reloadShader();
+    void getDataForPaint();
 
     // mouse / wheel events
     void mouseDrag(const juce::MouseEvent &e) override;
     void mouseWheelMove(const juce::MouseEvent &e, const juce::MouseWheelDetails &d) override;
 
   private:
+    juce::CriticalSection render_mutex;
     bool is_next_block_drawable = true;
     std::shared_ptr<Manager> manager;
     std::array<float[FFTConstants::FFT_LENGTH], 4> fft_data = {0.0f};
@@ -40,11 +39,22 @@ class ThreeImager : public juce::Component, private juce::Timer, public juce::Op
     juce::OpenGLContext _context;
     std::unique_ptr<juce::OpenGLShaderProgram> shader;
 
-    GLint projection_matrix_location;
-    GLint view_matrix_location;
-    GLint position_attribute;
+    struct Vertex {
+        float position[3]; // x, y, z
+        float colour[4];   // r, g, b, a
+    };
 
-    // opengl shader
+    std::vector<Vertex> point_cloud;
+    std::vector<unsigned int> index_buffer;
+
+    GLuint vbo; // vertex buffer object
+    GLuint ibo; // index buffer object
+
+    // opengl shader location
+    std::unique_ptr<juce::OpenGLShaderProgram::Uniform> projection_matrix_uniform;
+    std::unique_ptr<juce::OpenGLShaderProgram::Uniform> view_matrix_uniform;
+
+    // opengl shader;
     juce::String vertex_shader;
     juce::String fragment_shader;
 

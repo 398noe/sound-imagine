@@ -10,7 +10,7 @@ class ThreeImager : public juce::Component, private juce::Timer, public juce::Op
     ThreeImager(std::shared_ptr<Manager> data);
     ~ThreeImager() override;
 
-    void paint(juce::Graphics &g) override;
+    void paint(juce::Graphics &) override;
     void resized() override;
 
     void timerCallback() override;
@@ -25,8 +25,13 @@ class ThreeImager : public juce::Component, private juce::Timer, public juce::Op
     bool is_next_block_drawable = true;
     std::shared_ptr<Manager> manager;
     std::array<float[FFTConstants::FFT_LENGTH], 4> fft_data = {0.0f};
+    std::array<float, FFTConstants::FFT_LENGTH> fft_freq = {0.0f};
 
     juce::OpenGLContext _context;
+    GLuint shader;
+    GLint projection_matrix_location;
+    GLint view_matrix_location;
+    GLint position_attribute;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ThreeImager)
 };

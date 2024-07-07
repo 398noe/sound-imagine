@@ -20,16 +20,12 @@ juce_add_plugin("${PROJECT_NAME}"
 
 juce_generate_juce_header(${PROJECT_NAME})
 
-set(SHADER_FILES
-    shader/vertex.glsl
-    shader/fragment.glsl
-)
-
 target_sources(${PROJECT_NAME}
     PRIVATE
         lib/AudioUtilities.cpp
         lib/Manager.cpp
         lib/Processor.cpp
+        lib/Shader.cpp
         component/Imager.cpp
         component/LRImager.cpp
         component/ThreeImager.cpp
@@ -39,12 +35,12 @@ target_sources(${PROJECT_NAME}
         include/lib/Constant.h
         include/lib/Manager.h
         include/lib/Processor.h
+        include/lib/Shader.h
         include/PluginProcessor.h
         include/PluginEditor.h
         include/component/Imager.h
         include/component/LRImager.h
         include/component/ThreeImager.h
-        ${SHADER_FILES}
 )
 
 target_include_directories("${PROJECT_NAME}"

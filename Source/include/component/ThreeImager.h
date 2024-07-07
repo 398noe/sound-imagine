@@ -20,10 +20,12 @@ class ThreeImager : public juce::Component, private juce::Timer, public juce::Op
     void renderOpenGL() override;
     void openGLContextClosing() override;
 
+    juce::Matrix3D<float> getProjectionMatrix();
     juce::Matrix3D<float> getViewMatrix();
     void getDataForPaint();
 
-    void createShaders();
+    void createShader();
+    void reloadShader();
 
     // mouse / wheel events
     void mouseDrag(const juce::MouseEvent &e) override;

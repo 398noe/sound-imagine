@@ -16,7 +16,7 @@ ThreeImager::ThreeImager(std::shared_ptr<Manager> data) : manager(data) {
     _context.setContinuousRepainting(true);
 
     // set shaders
-    createShaders();
+    createShader();
 #endif
 
     // shader_program = _context.extensions.glCreateProgram();
@@ -81,6 +81,13 @@ void ThreeImager::renderOpenGL() {
     }
 }
 
+juce::Matrix3D<float> ThreeImager::getProjectionMatrix() {
+    auto w = 1.0f / (0.5f + 0.1f);
+    auto h = w * getLocalBounds().toFloat().getAspectRatio(false);
+
+    return juce::Matrix3D<float>::fromFrustum(-w, w, -h, h, 4.0f, 30.0f);
+}
+
 juce::Matrix3D<float> ThreeImager::getViewMatrix() {
     const juce::ScopedLock lock(std::mutex);
     auto view_matrix = juce::Matrix3D<float>::fromTranslation({0.0f, 0.0f, -5.0f}) * orientation.getRotationMatrix();
@@ -109,19 +116,25 @@ void ThreeImager::getDataForPaint() {
 
 void ThreeImager::newOpenGLContextCreated() {}
 
-void ThreeImager::createShaders() {
-    vertex_shader = R"(
+void ThreeImager::createShader() {
+    vertex_shader = juce::String(R"(
         attribute vec3 position;
         uniform mat4 projectionMatrix;
         uniform mat4 viewMatrix;
         void main() {
             gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
         }
-    )";
+    )");
 
-    fragment_shader = R"(
+    fragment_shader = juce::String(R"(
         void main() {
             gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
         }
-    )";
+    )");
 }
+
+void ThreeImager::mouseDrag(const juce::MouseEvent &e) {}
+
+void ThreeImager::mouseWheelMove(const juce::MouseEvent &e, const juce::MouseWheelDetails &d) {}
+
+void ThreeImager::reloadShader() {}

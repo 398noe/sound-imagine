@@ -3,6 +3,7 @@
 GLTest::GLTest() {
     startTimerHz(60);
     setSize(400, 400);
+    setOpaque(true);
 
     _context.attachTo(*this);
     _context.setRenderer(this);
@@ -19,13 +20,24 @@ GLTest::~GLTest() {
 
 void GLTest::newOpenGLContextCreated() {
     _context.extensions.glGenBuffers(1, &vbo);
-    // _context.extensions.glGenBuffers(1, &ibo);
 
     // set axis
-    axis = {{{-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},                                                  // X軸
-            {{1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},  {{0.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}}, // Y軸
-            {{0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},  {{0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}, // Z軸
-            {{0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
+    axis = {
+        {{-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}}, {{1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},     // X軸
+        {{0.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}}, {{0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},     // Y軸
+        {{0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}, {{0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}},     // Z軸
+        {{0.0f, 0.0f, 0.0f}, {1.0f, 0.5f, 0.0f, 1.0f}},  {{0.707f, 0.707f, 0.0f}, {1.0f, 0.5f, 0.0f, 1.0f}}, // R軸
+        {{0.0f, 0.0f, 0.0f}, {0.0f, 0.5f, 1.0f, 1.0f}},  {{-0.707f, 0.707f, 0.0f}, {0.0f, 0.5f, 1.0f, 1.0f}} // L軸
+    };
+
+    // ラベルの設定
+    label = {
+        {{1.1f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // X (Mid)
+        {{0.0f, 1.1f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // Y (Side)
+        {{0.0f, 0.0f, 1.1f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // Z (Hz)
+        {{0.8f, 0.8f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // R
+        {{-0.8f, 0.8f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}} // L
+    };
 
     // set vertices
     vertices = {{{0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
@@ -34,24 +46,28 @@ void GLTest::newOpenGLContextCreated() {
                 {{0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
 
     _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
-    _context.extensions.glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * (vertices.size() + axis.size()), nullptr,
-                                     juce::gl::GL_STATIC_DRAW);
-    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, 0, sizeof(OpenGLShader::Vertex) * axis.size(),
-                                        axis.data()); // 軸の描画に使用するバッファ, 視点変更によって変更されることはあるのだろうか。
-    _context.extensions.glBufferSubData(
-        juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * axis.size(), sizeof(OpenGLShader::Vertex) * vertices.size(),
-        vertices
-            .data()); // このバッファは頂点データを保持するが、今後FFTの結果を保持するバッファに変更するため、可変的に変更することになる。
+    _context.extensions.glBufferData(juce::gl::GL_ARRAY_BUFFER,
+                                     sizeof(OpenGLShader::Vertex) * (axis.size() + label.size() + vertices.size()), nullptr,
+                                     juce::gl::GL_DYNAMIC_DRAW);
+    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, 0, sizeof(OpenGLShader::Vertex) * axis.size(), axis.data());
+    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * axis.size(),
+                                        sizeof(OpenGLShader::Vertex) * label.size(), label.data());
+    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * (axis.size() + label.size()),
+                                        sizeof(OpenGLShader::Vertex) * vertices.size(), vertices.data());
 
     vertex_shader = R"(
         #version 330 core
-        in vec4 position;
-        in vec4 colour;
+        layout(location = 0) in vec3 position;
+        layout(location = 1) in vec4 colour;
 
         out vec4 frag_colour;
 
+        uniform mat4 model;
+        uniform mat4 view;
+        uniform mat4 projection;
+
         void main() {
-            gl_Position = position;
+            gl_Position = projection * view * model * vec4(position, 1.0);
             frag_colour = colour;
         }
     )";
@@ -71,6 +87,8 @@ void GLTest::newOpenGLContextCreated() {
     } else {
         jassertfalse;
     }
+
+    updateProjectionMatrix();
 }
 
 void GLTest::openGLContextClosing() {}
@@ -80,11 +98,14 @@ void GLTest::renderOpenGL() {
 
     shader->use();
 
+    shader->setUniformMat4("model", model_matrix.mat, 1, false);
+    shader->setUniformMat4("view", view_matrix.mat, 1, false);
+    shader->setUniformMat4("projection", projection_matrix.mat, 1, false);
+
     OpenGLShader::Attributes attributes(*shader);
     attributes.enable();
 
     _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
-    // _context.extensions.glBindBuffer(juce::gl::GL_ELEMENT_ARRAY_BUFFER, ibo);
 
     _context.extensions.glVertexAttribPointer(0, 3, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, sizeof(OpenGLShader::Vertex), nullptr);
     _context.extensions.glEnableVertexAttribArray(0);
@@ -93,18 +114,55 @@ void GLTest::renderOpenGL() {
                                               (GLvoid *)(sizeof(float) * 3));
     _context.extensions.glEnableVertexAttribArray(1);
 
-    // 点のサイズを設定 (例: 5.0f)
-    juce::gl::glPointSize(5.0f);
-
-    // X, Y, Z軸を描画
+    juce::gl::glLineWidth(2.0f);
     juce::gl::glDrawArrays(juce::gl::GL_LINES, 0, axis.size());
 
-    // GL_POINTSモードで点を描画
-    juce::gl::glDrawArrays(juce::gl::GL_POINTS, axis.size(), vertices.size());
+    juce::gl::glPointSize(10.0f);
+    juce::gl::glDrawArrays(juce::gl::GL_POINTS, axis.size(), label.size());
+
+    juce::gl::glPointSize(5.0f);
+    juce::gl::glDrawArrays(juce::gl::GL_POINTS, axis.size() + label.size(), vertices.size());
 
     attributes.disable();
 }
 
-void GLTest::resized() {}
+void GLTest::mouseDown(const juce::MouseEvent &e) {}
 
-void GLTest::timerCallback() {}
+void GLTest::mouseDrag(const juce::MouseEvent &e) {
+    rotation.x += e.getDistanceFromDragStartX() * 0.001f;
+    rotation.y += e.getDistanceFromDragStartY() * 0.001f;
+    updateProjectionMatrix();
+    repaint();
+}
+
+void GLTest::mouseWheelMove(const juce::MouseEvent &e, const juce::MouseWheelDetails &wheel) {
+    zoom += wheel.deltaY;
+    zoom = juce::jlimit(0.1f, 10.0f, zoom);
+    updateProjectionMatrix();
+    repaint();
+}
+
+void GLTest::updateProjectionMatrix() {
+    auto aspect = (float)getWidth() / (float)getHeight();
+    projection_matrix = juce::Matrix3D<float>::fromFrustum(-aspect, aspect, -1.0f, 1.0f, 1.0f, 100.0f);
+    view_matrix = juce::Matrix3D<float>::fromTranslation(juce::Vector3D<float>(0.0f, 0.0f, -5.0f / zoom));
+    model_matrix = juce::Matrix3D<float>::rotation(juce::Vector3D<float>(rotation.x, rotation.y, rotation.z));
+}
+
+void GLTest::resized() { updateProjectionMatrix(); }
+
+void GLTest::timerCallback() {
+    // ここでFFTのデータを更新する
+    // @todo FFTの結果からverticesを更新する必要がある
+    // 更新したFFTのデータをverticesに格納する
+    _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
+    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * (axis.size() + label.size()),
+                                        sizeof(OpenGLShader::Vertex) * vertices.size(), vertices.data());
+}
+
+void GLTest::paint(juce::Graphics &g) {
+    // zoom, rotationの値をテキストで表示する
+    g.setColour(juce::Colours::white);
+    g.drawText("Zoom: " + juce::String(zoom), 10, 10, 100, 20, juce::Justification::left);
+    g.drawText("Rotation: " + juce::String(rotation.x) + ", " + juce::String(rotation.y), 10, 30, 200, 20, juce::Justification::left);
+}

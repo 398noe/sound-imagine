@@ -11,12 +11,10 @@
 
 //==============================================================================
 SoundImagineAudioProcessorEditor::SoundImagineAudioProcessorEditor(SoundImagineAudioProcessor &p)
-    : AudioProcessorEditor(&p), audioProcessor(p) {
+    : AudioProcessorEditor(&p), audioProcessor(p), three_imager(p.getManager()) {
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
-    // addAndMakeVisible(imager);
-    // addAndMakeVisible(lr_imager);
-    addAndMakeVisible(gl_test);
+    addAndMakeVisible(three_imager);
     setSize(400, 400);
     setResizable(true, true);
     setResizeLimits(200, 200, 800, 800);
@@ -35,5 +33,5 @@ void SoundImagineAudioProcessorEditor::resized() {
     // subcomponents in your editor..
     // imager.setBounds(0, 0, getWidth(), getHeight());
     // lr_imager.setBounds(0, 0, getWidth(), getHeight());
-    gl_test.setBounds(0, 0, getWidth(), getHeight());
+    three_imager.setBounds(0, 0, getWidth(), getHeight());
 }

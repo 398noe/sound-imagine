@@ -7,9 +7,6 @@ ThreeImager::ThreeImager(std::shared_ptr<Manager> data) : manager(data) {
     setSize(600, 600);
     setOpaque(true);
 
-    // if (juce::ComponentPeer *peer = getPeer()) {
-    //     peer->setCurrentRenderingEngine(0);
-    // }
     _context.attachTo(*this); // or attachTo(*getTopLevelComponent())
     _context.setRenderer(this);
     _context.setContinuousRepainting(true);
@@ -24,9 +21,6 @@ ThreeImager::~ThreeImager() {
 }
 
 void ThreeImager::newOpenGLContextCreated() {
-    // generate buffer for vertex
-    _context.extensions.glGenBuffers(1, &vbo);
-
     // set axis
     axis = {
         {{-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}}, {{1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},     // X軸
@@ -47,17 +41,10 @@ void ThreeImager::newOpenGLContextCreated() {
 
     // set vertices
     vertices.reserve(FFTConstants::FFT_LENGTH);
-    vertices = {};
+    vertices = {{{0.5f, 0.5f, 0.5f}, {1.0f, 1.0f, 1.0f, 1.0f}}};
 
-    _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
-    _context.extensions.glBufferData(juce::gl::GL_ARRAY_BUFFER,
-                                     sizeof(OpenGLShader::Vertex) * (axis.size() + label.size() + FFTConstants::FFT_LENGTH), nullptr,
-                                     juce::gl::GL_DYNAMIC_DRAW);
-    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, 0, sizeof(OpenGLShader::Vertex) * axis.size(), axis.data());
-    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * axis.size(),
-                                        sizeof(OpenGLShader::Vertex) * label.size(), label.data());
-    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * (axis.size() + label.size()),
-                                        sizeof(OpenGLShader::Vertex) * vertices.size(), vertices.data());
+    this->vertex_buffer = OpenGLShader::VertexBuffer();
+    this->vertex_buffer.init(vertices.data(), juce::gl::GL_POINTS);
 
     vertex_shader = R"(
         #version 330 core
@@ -95,7 +82,10 @@ void ThreeImager::newOpenGLContextCreated() {
     updateProjectionMatrix();
 }
 
-void ThreeImager::openGLContextClosing() {}
+void ThreeImager::openGLContextClosing() {
+    _context.extensions.glDeleteVertexArrays(1, &vao);
+    _context.extensions.glDeleteBuffers(1, &vbo);
+}
 
 void ThreeImager::renderOpenGL() {
     if (fft_data.empty()) {
@@ -109,30 +99,23 @@ void ThreeImager::renderOpenGL() {
     shader->setUniformMat4("view", view_matrix.mat, 1, false);             // 表示行列
     shader->setUniformMat4("projection", projection_matrix.mat, 1, false); // 射影行列
 
-    OpenGLShader::Attributes attributes(*shader);
-    attributes.enable();
+    // _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vao);
+    vertex_buffer.bind();
+    vertex_buffer.draw();
+    // OpenGLShader::Attributes attributes(*shader);
+    // attributes.enable();
 
-    _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
+    // juce::gl::glLineWidth(2.0f);
+    // juce::gl::glDrawArrays(juce::gl::GL_LINES, 0, axis.size());
 
-    // x, y, z
-    _context.extensions.glVertexAttribPointer(0, 3, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, sizeof(OpenGLShader::Vertex), nullptr);
-    _context.extensions.glEnableVertexAttribArray(0);
+    // juce::gl::glPointSize(10.0f);
+    // juce::gl::glDrawArrays(juce::gl::GL_POINTS, axis.size(), label.size());
 
-    // color (rgba)
-    _context.extensions.glVertexAttribPointer(1, 4, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, sizeof(OpenGLShader::Vertex),
-                                              (GLvoid *)(sizeof(float) * 3));
-    _context.extensions.glEnableVertexAttribArray(1);
+    // juce::gl::glPointSize(5.0f);
+    // juce::gl::glDrawArrays(juce::gl::GL_POINTS, axis.size() + label.size(), vertices.size());
 
-    juce::gl::glLineWidth(2.0f);
-    juce::gl::glDrawArrays(juce::gl::GL_LINES, 0, axis.size());
-
-    juce::gl::glPointSize(10.0f);
-    juce::gl::glDrawArrays(juce::gl::GL_POINTS, axis.size(), label.size());
-
-    juce::gl::glPointSize(5.0f);
-    juce::gl::glDrawArrays(juce::gl::GL_POINTS, axis.size() + label.size(), vertices.size());
-
-    attributes.disable();
+    // _context.extensions.glBindVertexArray(0);
+    // attributes.disable();
 }
 
 void ThreeImager::mouseDown(const juce::MouseEvent &e) {
@@ -177,19 +160,7 @@ void ThreeImager::timerCallback() {
     // FFTの結果からverticesを更新する必要がある
     setVertices();
     // openglのバッファを再生成する
-    _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
-
-    _context.extensions.glBufferData(juce::gl::GL_ARRAY_BUFFER,
-                                     sizeof(OpenGLShader::Vertex) * (axis.size() + label.size() + vertices.size()), nullptr,
-                                     juce::gl::GL_DYNAMIC_DRAW);
-    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, 0, sizeof(OpenGLShader::Vertex) * axis.size(), axis.data());
-    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * axis.size(),
-                                        sizeof(OpenGLShader::Vertex) * label.size(), label.data());
-    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * (axis.size() + label.size()),
-                                        sizeof(OpenGLShader::Vertex) * vertices.size(), vertices.data());
-
-    // _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * (axis.size() + label.size()),
-    //                                     sizeof(OpenGLShader::Vertex) * vertices.size(), vertices.data());
+    // updateVBO();
     updateProjectionMatrix();
     repaint();
 }
@@ -206,6 +177,32 @@ void ThreeImager::setVertices() {
         float z = juce::jmap(fft_freq[i], 0.0f, 24000.0f, -1.0f, 1.0f);
         vertices.push_back({{x, y, z}, {1.0f, 1.0f, 1.0f, 1.0f}});
     }
+}
+
+void ThreeImager::setupVBO() {
+    _context.extensions.glGenVertexArrays(1, &vao);
+    _context.extensions.glBindVertexArray(vao);
+
+    _context.extensions.glGenBuffers(1, &vbo);
+    _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
+    _context.extensions.glBufferData(juce::gl::GL_ARRAY_BUFFER,
+                                     sizeof(OpenGLShader::Vertex) * (axis.size() + label.size() + FFTConstants::FFT_LENGTH), nullptr,
+                                     juce::gl::GL_DYNAMIC_DRAW);
+
+    _context.extensions.glVertexAttribPointer(0, 3, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, sizeof(OpenGLShader::Vertex), nullptr);
+    _context.extensions.glVertexAttribPointer(1, 4, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, sizeof(OpenGLShader::Vertex),
+                                              (GLvoid *)(sizeof(float) * 3));
+
+    _context.extensions.glEnableVertexAttribArray(0);
+    _context.extensions.glEnableVertexAttribArray(1);
+
+    _context.extensions.glBindVertexArray(0);
+}
+
+void ThreeImager::updateVBO() {
+    _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
+    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * (axis.size() + label.size()),
+                                        sizeof(OpenGLShader::Vertex) * vertices.size(), vertices.data());
 }
 
 void ThreeImager::paint(juce::Graphics &g) {
@@ -236,4 +233,44 @@ juce::Matrix3D<float> ThreeImager::getViewMatrix() {
     auto rm = orientation.getRotationMatrix();
 
     return vm * rm;
+}
+
+/// shaper
+Shaper::Shaper() {}
+Shaper::~Shaper() {
+    juce::gl::glDeleteBuffers(1, &v_vbo);
+    juce::gl::glDeleteVertexArrays(1, &vao);
+}
+
+void Shaper::setup(GLenum mode = juce::gl::GL_POINTS) {
+    this->mode = mode;
+}
+
+void Shaper::addVertex(Shaper::Vertex v) {
+    vertices.push_back(v);
+}
+
+void Shaper::clearVertex() {
+    vertices.clear();
+}
+
+void Shaper::updateBuffer() {
+    juce::gl::glBindVertexArray(vao);
+    juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, v_vbo);
+    juce::gl::glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(Shaper::Vertex) * vertices.size(), vertices.data(), juce::gl::GL_STATIC_DRAW);
+
+    juce::gl::glVertexAttribPointer(0, 3, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, sizeof(Shaper::Vertex), (GLvoid *)0);
+    juce::gl::glEnableVertexAttribArray(0);
+
+    juce::gl::glVertexAttribPointer(1, 4, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, sizeof(Shaper::Vertex), (GLvoid *)(3 * sizeof(GLfloat)));
+    juce::gl::glEnableVertexAttribArray(1);
+
+    juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, 0);
+    juce::gl::glBindVertexArray(0);
+}
+
+void Shaper::draw() {
+    juce::gl::glBindVertexArray(vao);
+    juce::gl::glDrawArrays(mode, 0, vertices.size());
+    juce::gl::glBindVertexArray(0);
 }

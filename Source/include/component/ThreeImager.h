@@ -25,12 +25,16 @@ class ThreeImager : public juce::Component, public juce::OpenGLRenderer, private
     void mouseDrag(const juce::MouseEvent &e) override;
     void mouseWheelMove(const juce::MouseEvent &e, const juce::MouseWheelDetails &wheel) override;
 
+    void setupVBO();
+    void updateVBO();
     void updateProjectionMatrix();
 
   private:
     std::shared_ptr<Manager> manager;
     std::array<float[FFTConstants::FFT_LENGTH], 4> fft_data = {0.0f};
     std::array<float, FFTConstants::FFT_LENGTH> fft_freq = {0.0f};
+
+    OpenGLShader::VertexBuffer vertex_buffer;
 
     std::vector<OpenGLShader::Vertex> vertices;
     std::vector<OpenGLShader::Vertex> axis;
@@ -46,7 +50,7 @@ class ThreeImager : public juce::Component, public juce::OpenGLRenderer, private
     juce::Rectangle<int> bounds;
     juce::Draggable3DOrientation orientation;
 
-    GLuint vbo;
+    GLuint vao, vbo;
 
     std::unique_ptr<juce::OpenGLShaderProgram> shader;
 
@@ -54,4 +58,27 @@ class ThreeImager : public juce::Component, public juce::OpenGLRenderer, private
     juce::String fragment_shader;
 
     juce::OpenGLContext _context;
+};
+
+class Shaper {
+  public:
+    Shaper();
+    ~Shaper();
+
+    struct Vertex {
+      float position[3];
+      float colour[4];
+    };
+
+    void setup(GLenum mode = juce::gl::GL_POINTS);
+    void addVertex(Vertex v);
+    void clearVertex();
+
+    void updateBuffer();
+    void draw();
+
+  private:
+    std::vector<Vertex> vertices;
+    GLenum mode;
+    GLuint vao, v_vbo, c_vbo;
 };

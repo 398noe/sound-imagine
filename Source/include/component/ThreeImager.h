@@ -19,6 +19,8 @@ class ThreeImager : public juce::Component, public juce::OpenGLRenderer, private
     juce::Matrix3D<float> getProjectionMatrix();
     void timerCallback() override;
 
+    void setVertices();
+
     void mouseDown(const juce::MouseEvent &e) override;
     void mouseDrag(const juce::MouseEvent &e) override;
     void mouseWheelMove(const juce::MouseEvent &e, const juce::MouseWheelDetails &wheel) override;

@@ -46,14 +46,12 @@ void ThreeImager::newOpenGLContextCreated() {
     };
 
     // set vertices
-    vertices = {{{0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
-                {{0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
-                {{-0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
-                {{0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
+    vertices.reserve(FFTConstants::FFT_LENGTH);
+    vertices = {};
 
     _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
     _context.extensions.glBufferData(juce::gl::GL_ARRAY_BUFFER,
-                                     sizeof(OpenGLShader::Vertex) * (axis.size() + label.size() + vertices.size()), nullptr,
+                                     sizeof(OpenGLShader::Vertex) * (axis.size() + label.size() + FFTConstants::FFT_LENGTH), nullptr,
                                      juce::gl::GL_DYNAMIC_DRAW);
     _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, 0, sizeof(OpenGLShader::Vertex) * axis.size(), axis.data());
     _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * axis.size(),
@@ -116,9 +114,11 @@ void ThreeImager::renderOpenGL() {
 
     _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
 
+    // x, y, z
     _context.extensions.glVertexAttribPointer(0, 3, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, sizeof(OpenGLShader::Vertex), nullptr);
     _context.extensions.glEnableVertexAttribArray(0);
 
+    // color (rgba)
     _context.extensions.glVertexAttribPointer(1, 4, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, sizeof(OpenGLShader::Vertex),
                                               (GLvoid *)(sizeof(float) * 3));
     _context.extensions.glEnableVertexAttribArray(1);
@@ -174,11 +174,38 @@ void ThreeImager::timerCallback() {
     // ここでFFTのデータを更新する
     fft_data = manager->getFFTResult();
     fft_freq = manager->getFFTFreqs();
-    // @todo FFTの結果からverticesを更新する必要がある
-    // 更新したFFTのデータをverticesに格納する
+    // FFTの結果からverticesを更新する必要がある
+    setVertices();
+    // openglのバッファを再生成する
     _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
+
+    _context.extensions.glBufferData(juce::gl::GL_ARRAY_BUFFER,
+                                     sizeof(OpenGLShader::Vertex) * (axis.size() + label.size() + vertices.size()), nullptr,
+                                     juce::gl::GL_DYNAMIC_DRAW);
+    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, 0, sizeof(OpenGLShader::Vertex) * axis.size(), axis.data());
+    _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * axis.size(),
+                                        sizeof(OpenGLShader::Vertex) * label.size(), label.data());
     _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * (axis.size() + label.size()),
                                         sizeof(OpenGLShader::Vertex) * vertices.size(), vertices.data());
+
+    // _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, sizeof(OpenGLShader::Vertex) * (axis.size() + label.size()),
+    //                                     sizeof(OpenGLShader::Vertex) * vertices.size(), vertices.data());
+    updateProjectionMatrix();
+    repaint();
+}
+
+void ThreeImager::setVertices() {
+    // fft_dataからverticesを更新する
+    // verticesをリセットする
+    vertices.clear();
+    // 一つずつ詰めなおす
+    for (int i = 0; i < FFTConstants::FFT_LENGTH; i++) {
+        // x は mid, y は side, z は Hz, これらを0~1の範囲に収める
+        float x = juce::jmap(fft_data[2][i], -0.5f, 0.5f, -2.0f, 2.0f);
+        float y = juce::jmap(fft_data[3][i], -0.5f, 0.5f, -2.0f, 2.0f);
+        float z = juce::jmap(fft_freq[i], 0.0f, 24000.0f, -1.0f, 1.0f);
+        vertices.push_back({{x, y, z}, {1.0f, 1.0f, 1.0f, 1.0f}});
+    }
 }
 
 void ThreeImager::paint(juce::Graphics &g) {

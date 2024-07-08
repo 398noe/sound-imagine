@@ -19,6 +19,7 @@ GLTest::~GLTest() {
 }
 
 void GLTest::newOpenGLContextCreated() {
+    // generate buffer for vertex
     _context.extensions.glGenBuffers(1, &vbo);
 
     // set axis
@@ -98,9 +99,9 @@ void GLTest::renderOpenGL() {
 
     shader->use();
 
-    shader->setUniformMat4("model", model_matrix.mat, 1, false);
-    shader->setUniformMat4("view", view_matrix.mat, 1, false);
-    shader->setUniformMat4("projection", projection_matrix.mat, 1, false);
+    shader->setUniformMat4("model", model_matrix.mat, 1, false);           // 回転行列
+    shader->setUniformMat4("view", view_matrix.mat, 1, false);             // 表示行列
+    shader->setUniformMat4("projection", projection_matrix.mat, 1, false); // 射影行列
 
     OpenGLShader::Attributes attributes(*shader);
     attributes.enable();
@@ -126,77 +127,40 @@ void GLTest::renderOpenGL() {
     attributes.disable();
 }
 
-void GLTest::mouseDown(const juce::MouseEvent &e) {}
+void GLTest::mouseDown(const juce::MouseEvent &e) {
+    juce::ScopedLock lock(render_lock);
+    orientation.mouseDown(e.getPosition());
+    updateProjectionMatrix();
+    repaint();
+}
 
 void GLTest::mouseDrag(const juce::MouseEvent &e) {
-    auto delta_x = e.getDistanceFromDragStartX();
-    auto delta_y = e.getDistanceFromDragStartY();
-
-    yaw += delta_x * 0.001f;
-    pitch += delta_y * 0.001f;
-
-    // pitch = juce::jlimit(-juce::MathConstants<float>::halfPi, juce::MathConstants<float>::halfPi, pitch);
-
-    float radius = 5.0f;
-    camera_position.x = radius * std::cos(yaw) * std::cos(pitch);
-    camera_position.y = radius * std::sin(pitch);
-    camera_position.z = radius * std::sin(yaw) * std::cos(pitch);
-
+    juce::ScopedLock lock(render_lock);
+    orientation.mouseDrag(e.getPosition());
     updateProjectionMatrix();
     repaint();
 }
 
 void GLTest::mouseWheelMove(const juce::MouseEvent &e, const juce::MouseWheelDetails &wheel) {
-    zoom += wheel.deltaY;
-    zoom = juce::jlimit(0.1f, 10.0f, zoom);
+    scale += wheel.deltaY;
+    scale = juce::jlimit(0.1f, 10.0f, scale);
     updateProjectionMatrix();
     repaint();
-}
-
-juce::Vector3D<float> cross(const juce::Vector3D<float> &a, const juce::Vector3D<float> &b) {
-    return juce::Vector3D<float>(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
-}
-
-// ドット積を計算する関数
-float dot(const juce::Vector3D<float> &a, const juce::Vector3D<float> &b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-
-// lookAt行列を作成する関数
-juce::Matrix3D<float> GLTest::createLookAtMatrix(const juce::Vector3D<float> &eye, const juce::Vector3D<float> &center,
-                                                 const juce::Vector3D<float> &up) {
-    juce::Vector3D<float> f = (center - eye).normalised();
-    juce::Vector3D<float> s = cross(f, up).normalised();
-    juce::Vector3D<float> u = cross(s, f);
-
-    juce::Matrix3D<float> result;
-    result.mat[0] = s.x;
-    result.mat[4] = s.y;
-    result.mat[8] = s.z;
-    result.mat[12] = -dot(s, eye);
-    result.mat[1] = u.x;
-    result.mat[5] = u.y;
-    result.mat[9] = u.z;
-    result.mat[13] = -dot(u, eye);
-    result.mat[2] = -f.x;
-    result.mat[6] = -f.y;
-    result.mat[10] = -f.z;
-    result.mat[14] = dot(f, eye);
-    result.mat[3] = 0.0f;
-    result.mat[7] = 0.0f;
-    result.mat[11] = 0.0f;
-    result.mat[15] = 1.0f;
-
-    return result;
 }
 
 void GLTest::updateProjectionMatrix() {
     auto aspect = (float)getWidth() / (float)getHeight();
     projection_matrix = juce::Matrix3D<float>::fromFrustum(-aspect, aspect, -1.0f, 1.0f, 1.0f, 100.0f);
-    view_matrix = juce::Matrix3D<float>::fromTranslation(juce::Vector3D<float>(0.0f, 0.0f, -5.0f / zoom));
-    model_matrix = createLookAtMatrix(camera_position, juce::Vector3D<float>(0.0f, 0.0f, 0.0f), juce::Vector3D<float>(0.0f, 1.0f, 0.0f));
-    // model_matrix = juce::Matrix3D<float>::rotation(juce::Vector3D<float>(camera_position.x, camera_position.y, camera_position.z));
+    view_matrix = juce::Matrix3D<float>::fromTranslation(juce::Vector3D<float>(0.0f, 0.0f, -5.0f / scale));
+    model_matrix = orientation.getRotationMatrix();
 }
 
-void GLTest::resized() { updateProjectionMatrix(); }
+void GLTest::resized() {
+    const juce::ScopedLock lock(render_lock);
+    bounds = getLocalBounds();
+    orientation.setViewport(bounds);
+    updateProjectionMatrix();
+}
 
 void GLTest::timerCallback() {
     // ここでFFTのデータを更新する
@@ -208,8 +172,31 @@ void GLTest::timerCallback() {
 }
 
 void GLTest::paint(juce::Graphics &g) {
-    // zoom, rotationの値をテキストで表示する
+    // zoom, orientationの値をテキストで表示する
     g.setColour(juce::Colours::white);
-    g.drawText("Zoom: " + juce::String(zoom), 10, 10, 100, 20, juce::Justification::left);
-    g.drawText("Rotation: " + juce::String(rotation.x) + ", " + juce::String(rotation.y), 10, 30, 200, 20, juce::Justification::left);
+    g.drawText("Zoom: " + juce::String(scale), 10, 10, 100, 20, juce::Justification::left);
+    auto rotation = orientation.getRotationMatrix();
+    g.drawText("Orientation: " + juce::String(rotation.mat[0]) + ", " + juce::String(rotation.mat[1]) + ", " +
+                   juce::String(rotation.mat[2]),
+               10, 30, 300, 20, juce::Justification::left);
+}
+
+juce::Matrix3D<float> GLTest::getProjectionMatrix() {
+    const juce::ScopedLock lock(render_lock);
+
+    auto w = 1.0f / (scale + 0.1f);
+    auto h = w * bounds.toFloat().getAspectRatio(false);
+
+    return juce::Matrix3D<float>::fromFrustum(-w, w, -h, h, 4.0f, 30.0f);
+}
+
+juce::Matrix3D<float> GLTest::getViewMatrix() {
+    const juce::ScopedLock lock(render_lock);
+
+    // 表示行列
+    auto vm = juce::Matrix3D<float>::fromTranslation({0.0f, 1.0f, -10.0f});
+    // 回転行列
+    auto rm = orientation.getRotationMatrix();
+
+    return vm * rm;
 }

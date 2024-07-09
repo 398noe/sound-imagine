@@ -40,21 +40,21 @@ void ThreeImager::initShaderProgram() {
 
         axis_shape.reset(new OpenGLShader::VertexShape());
         std::vector<OpenGLShader::Vertex> axis = {
-            {{-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}}, {{1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},     // X軸
-            {{0.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}}, {{0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},     // Y軸
-            {{0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}, {{0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}},     // Z軸
-            {{0.0f, 0.0f, 0.0f}, {1.0f, 0.5f, 0.0f, 1.0f}},  {{0.707f, 0.707f, 0.0f}, {1.0f, 0.5f, 0.0f, 1.0f}}, // R軸
-            {{0.0f, 0.0f, 0.0f}, {0.0f, 0.5f, 1.0f, 1.0f}},  {{-0.707f, 0.707f, 0.0f}, {0.0f, 0.5f, 1.0f, 1.0f}} // L軸
+            {{-10.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}}, {{10.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},  // X軸
+            {{0.0f, -10.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}}, {{0.0f, 10.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},  // Y軸
+            {{0.0f, 0.0f, -10.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}, {{0.0f, 0.0f, 10.0f}, {0.0f, 0.0f, 1.0f, 1.0f}},  // Z軸
+            {{0.0f, 0.0f, 0.0f}, {1.0f, 0.5f, 0.0f, 1.0f}},   {{7.07f, 7.07f, 0.0f}, {1.0f, 0.5f, 0.0f, 1.0f}}, // R軸
+            {{0.0f, 0.0f, 0.0f}, {0.0f, 0.5f, 1.0f, 1.0f}},   {{-7.07f, 7.07f, 0.0f}, {0.0f, 0.5f, 1.0f, 1.0f}} // L軸
         };
         axis_shape->init(axis, juce::gl::GL_LINES);
 
         label_shape.reset(new OpenGLShader::VertexShape());
         std::vector<OpenGLShader::Vertex> label = {
-            {{1.1f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // X (Mid)
-            {{0.0f, 1.1f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // Y (Side)
-            {{0.0f, 0.0f, 1.1f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // Z (Hz)
-            {{0.8f, 0.8f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // R
-            {{-0.8f, 0.8f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}} // L
+            {{11.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // X (Mid)
+            {{0.0f, 11.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // Y (Side)
+            {{0.0f, 0.0f, 11.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // Z (Hz)
+            {{8.0f, 8.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},  // R
+            {{-8.0f, 8.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}  // L
         };
         label_shape->init(label, juce::gl::GL_POINTS);
 
@@ -77,9 +77,9 @@ void ThreeImager::updateShader() {
 }
 
 void ThreeImager::initVertices() {
-    vertices = {{{1.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
-                {{0.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
-                {{0.0f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}};
+    for (int i = 0; i < FFTConstants::FFT_LENGTH; i++) {
+        vertices.push_back({{0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}});
+    }
 }
 
 void ThreeImager::openGLContextClosing() {

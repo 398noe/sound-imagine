@@ -22,7 +22,7 @@ struct OpenGLShader {
 
             if (colour.get() != nullptr) {
                 juce::gl::glVertexAttribPointer(colour->attributeID, 4, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, sizeof(Vertex),
-                                                (GLvoid *)(sizeof(float) * 6));
+                                                (GLvoid *)(sizeof(float) * 3));
                 juce::gl::glEnableVertexAttribArray(colour->attributeID);
             }
         }
@@ -67,57 +67,60 @@ struct OpenGLShader {
         }
     };
 
-    struct VertexBuffer {
-        VertexBuffer() {};
+    struct VertexShape {
+        explicit VertexShape() {
+            juce::gl::glGenVertexArrays(1, &vao);
+            juce::gl::glGenBuffers(1, &vbo);
+        };
+        ~VertexShape() {
+            juce::gl::glDeleteVertexArrays(1, &vao);
+            juce::gl::glDeleteBuffers(1, &vbo);
+        };
 
-        ~VertexBuffer() { juce::gl::glDeleteBuffers(1, &v_vbo); };
+        void init(std::vector<Vertex> v, GLenum m) {
+            this->vertices = v;
+            this->mode = m;
 
-        void init(Vertex *vertices, GLenum mode) {
-            this->vertices = vertices;
-            this->mode = mode;
-            juce::gl::glGenBuffers(1, &v_vbo);
-            juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, v_vbo);
-            juce::gl::glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(Vertex), vertices, juce::gl::GL_STATIC_DRAW);
+            juce::gl::glBindVertexArray(vao);
+            juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
+            juce::gl::glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(Vertex) * vertices.size(), vertices.data(), juce::gl::GL_DYNAMIC_DRAW);
         }
 
         void bind() {
-            // bind buffer, 0 is position, 1 is colour
-            juce::gl::glGenVertexArrays(1, &vao);
             juce::gl::glBindVertexArray(vao);
-
-            // position attribute
-            juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, v_vbo);
-            juce::gl::glEnableVertexAttribArray(0);
-            juce::gl::glVertexAttribPointer(0, 3, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, 3 * sizeof(GLfloat), (GLvoid *)0);
-
-            // colour attribute
-            juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, c_vbo);
-            juce::gl::glEnableVertexAttribArray(1);
-            juce::gl::glVertexAttribPointer(1, 4, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, 4 * sizeof(GLfloat), (GLvoid *)0); // rbga
-
-            juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, 0);
-            juce::gl::glBindVertexArray(0);
-        };
-
-        void draw() {
-            juce::gl::glBindVertexArray(vao);
-            juce::gl::glPointSize(10.0f);
-            juce::gl::glDrawArrays(mode, 0, sizeof(vertices) / sizeof(Vertex));
-            juce::gl::glBindVertexArray(0);
-
-            juce::gl::glDisableVertexAttribArray(0);
-            juce::gl::glDisableVertexAttribArray(1);
+            juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
+        }
+        
+        GLenum getMode() {
+            return mode;
         }
 
-        void update(Vertex *vertices) {
-            // update buffer
-            juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, v_vbo);
-            juce::gl::glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(Vertex), vertices, juce::gl::GL_STATIC_DRAW);
+        std::vector<Vertex> getVertices() {
+            return vertices;
         }
 
-      private:
-        GLuint vao, v_vbo, c_vbo;
-        Vertex *vertices;
-        GLenum mode;
+        private:
+            std::vector<Vertex> vertices;
+            GLenum mode;
+            GLuint vao, vbo;
+    };
+
+    struct Shape {
+        explicit Shape() {};
+
+        void add(VertexShape &shape) {
+            shapes.add(&shape);
+        }
+
+        void draw(Attributes &attributes) {
+            for (auto * sp: shapes) {
+                sp->bind();
+                attributes.enable();
+                juce::gl::glDrawArrays(sp->getMode(), 0, sp->getVertices().size());
+                attributes.disable();
+            }
+        } 
+        
+        juce::OwnedArray<VertexShape> shapes;
     };
 };

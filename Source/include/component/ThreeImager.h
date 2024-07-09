@@ -31,7 +31,7 @@ class ThreeImager : public juce::Component, public juce::OpenGLRenderer, private
         float colour[4];
     };
 
-    void initShaderProgram(const ShaderSource &source);
+    void updateShaderProgram();
     void initVertices();
     void setVertices();
     void updateBuffer();
@@ -42,7 +42,11 @@ class ThreeImager : public juce::Component, public juce::OpenGLRenderer, private
     std::array<float[FFTConstants::FFT_LENGTH], 4> fft_data = {0.0f};
     std::array<float, FFTConstants::FFT_LENGTH> fft_freq = {0.0f};
 
-    juce::CriticalSection render_lock;
+    // mutex
+    juce::CriticalSection mutex;
+    juce::CriticalSection matrix_mutex;
+
+    // matrix
     juce::Matrix3D<float> projection_matrix;
     juce::Matrix3D<float> view_matrix;
     juce::Matrix3D<float> model_matrix;
@@ -51,11 +55,43 @@ class ThreeImager : public juce::Component, public juce::OpenGLRenderer, private
     juce::Rectangle<int> bounds;
     juce::Draggable3DOrientation orientation;
 
-    juce::String vertex_shader;
-    juce::String fragment_shader;
+    // shader source code
+    ShaderSource source = {
+        R"(
+        #version 330 core
+        in vec3 position;
+        in vec4 colour;
 
+        out vec4 frag_colour;
+
+        uniform mat4 model;
+        uniform mat4 view;
+        uniform mat4 projection;
+
+        void main() {
+            gl_Position = projection * view * model * vec4(position, 1.0);
+            frag_colour = colour;
+        }
+    )",
+        R"(
+        #version 330 core
+
+        in vec4 frag_colour;
+
+        void main() {
+            gl_FragColor = frag_colour;
+        }
+    )"};
+
+    // context
     juce::OpenGLContext _context;
+
+    // shader
     std::unique_ptr<juce::OpenGLShaderProgram> shader;
+    std::unique_ptr<OpenGLShader::Attributes> attributes;
+    std::unique_ptr<OpenGLShader::Uniforms> uniforms;
+    std::unique_ptr<OpenGLShader::Shape> shape;
+    std::unique_ptr<OpenGLShader::VertexShape> vertex_shape;
     std::vector<Vertex> vertices;
     GLuint vao, vbo;
 };

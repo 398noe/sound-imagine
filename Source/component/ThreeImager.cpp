@@ -7,13 +7,10 @@ ThreeImager::ThreeImager(std::shared_ptr<Manager> data) : manager(data) {
     setSize(600, 600);
     setOpaque(true);
 
+    _context.setOpenGLVersionRequired(juce::OpenGLContext::OpenGLVersion::openGL3_2);
     _context.setRenderer(this);
+    _context.attachTo(*this);
     _context.setContinuousRepainting(true);
-    _context.attachTo(*this); // or attachTo(*getTopLevelComponent())
-
-    // enable z buffer
-    juce::gl::glEnable(juce::gl::GL_DEPTH_TEST);
-    juce::gl::glDepthFunc(juce::gl::GL_LESS);
 }
 
 ThreeImager::~ThreeImager() {
@@ -22,107 +19,91 @@ ThreeImager::~ThreeImager() {
 }
 
 void ThreeImager::newOpenGLContextCreated() {
-    // compile shader and attach to the context
-    ShaderSource source = {};
-    source.vertex = R"(
-        #version 330 core
-        in vec3 position;
-        in vec4 colour;
-
-        out vec4 frag_colour;
-
-        uniform mat4 model;
-        uniform mat4 view;
-        uniform mat4 projection;
-
-        void main() {
-            gl_Position = projection * view * model * vec4(position, 1.0);
-            frag_colour = colour;
-        }
-    )";
-    source.fragment = R"(
-        #version 330 core
-
-        in vec4 frag_colour;
-
-        void main() {
-            gl_FragColor = frag_colour;
-        }
-    )";
-
-    initShaderProgram(source);
+    updateShaderProgram();
     initVertices();
 }
 
-void ThreeImager::initShaderProgram(const ShaderSource &source) {
+void ThreeImager::updateShaderProgram() {
     shader.reset(new juce::OpenGLShaderProgram(_context));
     if (shader->addVertexShader(source.vertex) && shader->addFragmentShader(source.fragment) && shader->link()) {
+        shape.reset();
+        attributes.reset();
+        uniforms.reset();
+    
+        // shader.reset(new_shader.release());
         shader->use();
+        
+        shape.reset(new OpenGLShader::Shape());
+        attributes.reset(new OpenGLShader::Attributes(*shader));
+        uniforms.reset(new OpenGLShader::Uniforms(*shader));
     } else {
         jassertfalse;
     }
 }
 
 void ThreeImager::initVertices() {
-    auto id = shader.get()->getProgramID();
-    juce::gl::glUseProgram(id);
-
-    // generate and set buffers
-    juce::gl::glGenVertexArrays(1, &vao);
-    juce::gl::glBindVertexArray(vao);
-
-    juce::gl::glGenBuffers(1, &vbo);
-    juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
-    juce::gl::glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(Vertex) * FFTConstants::FFT_LENGTH, nullptr, juce::gl::GL_DYNAMIC_DRAW);
 }
 
 void ThreeImager::openGLContextClosing() {
-    _context.extensions.glDeleteVertexArrays(1, &vao);
-    _context.extensions.glDeleteBuffers(1, &vbo);
+    shape.reset();
+    shader.reset();
+    attributes.reset();
+    uniforms.reset();
 }
 
 void ThreeImager::renderOpenGL() {
-    if (fft_data.empty()) {
-        return;
-    }
+    const juce::ScopedLock lock(mutex);
+    jassert(juce::OpenGLHelpers::isContextActive());
+    
     juce::OpenGLHelpers::clear(juce::Colours::black);
+    
+    updateShaderProgram();
+
+    // enable z buffer
+    juce::gl::glEnable(juce::gl::GL_DEPTH_TEST);
+    juce::gl::glDepthFunc(juce::gl::GL_LESS);
+    juce::gl::glEnable(juce::gl::GL_BLEND);
+    juce::gl::glBlendFunc(juce::gl::GL_SRC_ALPHA, juce::gl::GL_ONE_MINUS_SRC_ALPHA);
 
     shader->use();
 
-    shader->setUniformMat4("model", model_matrix.mat, 1, false);           // 回転行列
-    shader->setUniformMat4("view", view_matrix.mat, 1, false);             // 表示行列
-    shader->setUniformMat4("projection", projection_matrix.mat, 1, false); // 射影行列
+    // 行列の設定
+    if (uniforms->projection_matrix != nullptr) {
+        uniforms->projection_matrix->setMatrix4(projection_matrix.mat, 1, false);
+    }
 
-    _context.extensions.glBindVertexArray(vao);
-    _context.extensions.glVertexAttribPointer(0, 3, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, sizeof(Vertex), nullptr); // x, y, z
-    _context.extensions.glEnableVertexAttribArray(0);
-    _context.extensions.glVertexAttribPointer(1, 4, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, sizeof(Vertex),
-                                              (GLvoid *)(sizeof(float) * 3)); // r, g, b, a
-    _context.extensions.glEnableVertexAttribArray(1);
+    if (uniforms->view_matrix != nullptr) {
+        uniforms->view_matrix->setMatrix4(view_matrix.mat, 1, false);
+    }
 
-    juce::gl::glPointSize(2.0f);
-    juce::gl::glDrawArrays(juce::gl::GL_POINTS, 0, FFTConstants::FFT_LENGTH);
+    if (uniforms->model_matrix != nullptr) {
+        uniforms->model_matrix->setMatrix4(model_matrix.mat, 1, false);
+    }
 
-    _context.extensions.glDisableVertexAttribArray(0);
-    _context.extensions.glDisableVertexAttribArray(1);
+    shape->draw(*attributes);
+
+    juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, 0);
+
+    // juce::gl::glPointSize(2.0f);
+    // juce::gl::glDrawArrays(juce::gl::GL_POINTS, 0, FFTConstants::FFT_LENGTH);
 }
 
 void ThreeImager::mouseDown(const juce::MouseEvent &e) {
-    juce::ScopedLock lock(render_lock);
+    juce::ScopedLock lock(matrix_mutex);
     orientation.mouseDown(e.getPosition());
     updateProjectionMatrix();
     repaint();
 }
 
 void ThreeImager::mouseDrag(const juce::MouseEvent &e) {
-    juce::ScopedLock lock(render_lock);
+    juce::ScopedLock lock(matrix_mutex);
     orientation.mouseDrag(e.getPosition());
     updateProjectionMatrix();
     repaint();
 }
 
 void ThreeImager::mouseWheelMove(const juce::MouseEvent &e, const juce::MouseWheelDetails &wheel) {
-    juce::ScopedLock lock(render_lock);
+    juce::ScopedLock lock(matrix_mutex);
     scale += wheel.deltaY;
     scale = juce::jlimit(0.1f, 10.0f, scale);
     updateProjectionMatrix();
@@ -130,7 +111,7 @@ void ThreeImager::mouseWheelMove(const juce::MouseEvent &e, const juce::MouseWhe
 }
 
 void ThreeImager::resized() {
-    const juce::ScopedLock lock(render_lock);
+    const juce::ScopedLock lock(matrix_mutex);
     bounds = getLocalBounds();
     orientation.setViewport(bounds);
     updateProjectionMatrix();
@@ -159,14 +140,6 @@ void ThreeImager::setVertices() {
 }
 
 void ThreeImager::updateBuffer() {
-    // 更新されたverticesをもとにbufferを更新する
-    // _context.extensions.glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
-    juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
-    // _context.extensions.glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(Vertex) * FFTConstants::FFT_LENGTH, nullptr,
-    // juce::gl::GL_DYNAMIC_DRAW);
-    // _context.extensions.glBufferSubData(juce::gl::GL_ARRAY_BUFFER, 0, sizeof(Vertex) * FFTConstants::FFT_LENGTH, vertices.data());
-    // juce::gl::glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(Vertex) * FFTConstants::FFT_LENGTH, nullptr, juce::gl::GL_DYNAMIC_DRAW);
-    juce::gl::glBufferSubData(juce::gl::GL_ARRAY_BUFFER, 0, sizeof(Vertex) * FFTConstants::FFT_LENGTH, vertices.data());
 }
 
 void ThreeImager::timerCallback() {

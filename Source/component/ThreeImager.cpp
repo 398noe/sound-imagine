@@ -171,9 +171,9 @@ void ThreeImager::setVertices() {
     vertices.clear();
     // 一つずつ詰めなおす
     for (int i = 0; i < FFTConstants::FFT_LENGTH; i++) {
-        // x は mid, y は side, z は Hz, これらを0~1の範囲に収める
-        float x = juce::jmap(fft_data[2][i], -1.0f, 1.0f, -5.0f, 5.0f);
-        float y = juce::jmap(fft_data[3][i], -1.0f, 1.0f, -5.0f, 5.0f);
+        // x は side, y は mid, z は Hz, これらを0~1の範囲に収める
+        float x = juce::jmap(fft_data[3][i], -1.0f, 1.0f, -5.0f, 5.0f);
+        float y = juce::jmap(fft_data[2][i], -1.0f, 1.0f, -5.0f, 5.0f);
         float z = juce::jmap(fft_freq[i], 0.0f, 24000.0f, -5.0f, 5.0f);
         vertices.push_back({{x, y, z}, {1.0f, 1.0f, 1.0f, 1.0f}});
     }

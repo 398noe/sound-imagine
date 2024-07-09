@@ -3,14 +3,14 @@
 #include <mutex>
 
 ThreeImager::ThreeImager(std::shared_ptr<Manager> data) : manager(data) {
-    startTimerHz(60);
+    startTimerHz(30);
     setSize(600, 600);
     setOpaque(true);
 
     _context.setOpenGLVersionRequired(juce::OpenGLContext::OpenGLVersion::openGL3_2);
     _context.setRenderer(this);
     _context.attachTo(*this);
-    _context.setContinuousRepainting(true);
+    _context.setContinuousRepainting(false);
 }
 
 ThreeImager::~ThreeImager() {
@@ -27,6 +27,7 @@ void ThreeImager::initShaderProgram() {
     std::unique_ptr<juce::OpenGLShaderProgram> new_shader(new juce::OpenGLShaderProgram(_context));
     if (new_shader->addVertexShader(source.vertex) && new_shader->addFragmentShader(source.fragment) && new_shader->link()) {
         vertex_shape.reset();
+        axis_shape.reset();
         shape.reset();
         attributes.reset();
         uniforms.reset();
@@ -37,8 +38,30 @@ void ThreeImager::initShaderProgram() {
         vertex_shape.reset(new OpenGLShader::VertexShape());
         vertex_shape->init(vertices, juce::gl::GL_POINTS);
 
+        axis_shape.reset(new OpenGLShader::VertexShape());
+        std::vector<OpenGLShader::Vertex> axis = {
+            {{-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}}, {{1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},     // X軸
+            {{0.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}}, {{0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},     // Y軸
+            {{0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}, {{0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}},     // Z軸
+            {{0.0f, 0.0f, 0.0f}, {1.0f, 0.5f, 0.0f, 1.0f}},  {{0.707f, 0.707f, 0.0f}, {1.0f, 0.5f, 0.0f, 1.0f}}, // R軸
+            {{0.0f, 0.0f, 0.0f}, {0.0f, 0.5f, 1.0f, 1.0f}},  {{-0.707f, 0.707f, 0.0f}, {0.0f, 0.5f, 1.0f, 1.0f}} // L軸
+        };
+        axis_shape->init(axis, juce::gl::GL_LINES);
+
+        label_shape.reset(new OpenGLShader::VertexShape());
+        std::vector<OpenGLShader::Vertex> label = {
+            {{1.1f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // X (Mid)
+            {{0.0f, 1.1f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // Y (Side)
+            {{0.0f, 0.0f, 1.1f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // Z (Hz)
+            {{0.8f, 0.8f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}, // R
+            {{-0.8f, 0.8f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}} // L
+        };
+        label_shape->init(label, juce::gl::GL_POINTS);
+
         shape.reset(new OpenGLShader::Shape());
         shape->add(*vertex_shape);
+        shape->add(*axis_shape);
+        shape->add(*label_shape);
 
         attributes.reset(new OpenGLShader::Attributes(*shader));
         uniforms.reset(new OpenGLShader::Uniforms(*shader));
@@ -48,9 +71,7 @@ void ThreeImager::initShaderProgram() {
 }
 
 void ThreeImager::updateShader() {
-    const juce::ScopedLock lock(shader_mutex);
     vertex_shape->update(vertices);
-
     // shape.reset(new OpenGLShader::Shape());
     // shape->add(*vertex_shape);
 }
@@ -69,7 +90,7 @@ void ThreeImager::openGLContextClosing() {
 }
 
 void ThreeImager::renderOpenGL() {
-    const juce::ScopedLock lock(mutex);
+    const juce::ScopedLock lock(render_mutex);
     jassert(juce::OpenGLHelpers::isContextActive());
 
     juce::OpenGLHelpers::clear(juce::Colours::black);
@@ -97,12 +118,10 @@ void ThreeImager::renderOpenGL() {
         uniforms->model_matrix->setMatrix4(model_matrix.mat, 1, false);
     }
 
+    juce::gl::glPointSize(2.0f);
     shape->draw(*attributes);
 
     juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, 0);
-
-    // juce::gl::glPointSize(2.0f);
-    // juce::gl::glDrawArrays(juce::gl::GL_POINTS, 0, FFTConstants::FFT_LENGTH);
 }
 
 void ThreeImager::mouseDown(const juce::MouseEvent &e) {
@@ -140,10 +159,13 @@ void ThreeImager::updateProjectionMatrix() {
     projection_matrix = juce::Matrix3D<float>::fromFrustum(-aspect, aspect, -1.0f, 1.0f, 1.0f, 100.0f);
     view_matrix = juce::Matrix3D<float>::fromTranslation(juce::Vector3D<float>(0.0f, 0.0f, -20.0f / scale));
     model_matrix = orientation.getRotationMatrix();
+
+    _context.triggerRepaint();
 }
 
 void ThreeImager::setVertices() {
-    juce::ScopedLock lock(shader_mutex);
+    // レンダリング中に情報を更新できない
+    juce::ScopedLock lock(render_mutex);
     // fft_dataからverticesを更新する
     // verticesをリセットする
     vertices.clear();
@@ -163,7 +185,7 @@ void ThreeImager::timerCallback() {
     fft_freq = manager->getFFTFreqs();
     // verticesの更新
     setVertices();
-    // updateBuffer();
+    _context.triggerRepaint();
     repaint();
 }
 

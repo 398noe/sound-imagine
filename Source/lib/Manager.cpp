@@ -37,7 +37,7 @@ void Manager::setFFTResult() {
     for (int i = 0; i < 4; i++) {
         float *fft = processor[i].getFFTResult();
 
-        for (int j = 0; j < FFTConstants::FFT_LENGTH << 1; j++) {
+        for (int j = 0; j < FFTConstants::FFT_LENGTH; j++) {
             this->fft_result[i][j] = fft[j];
         }
     }

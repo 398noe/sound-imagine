@@ -90,37 +90,31 @@ struct OpenGLShader {
             juce::gl::glBindVertexArray(vao);
             juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
         }
-        
-        GLenum getMode() {
-            return mode;
-        }
 
-        std::vector<Vertex> getVertices() {
-            return vertices;
-        }
+        GLenum getMode() { return mode; }
 
-        private:
-            std::vector<Vertex> vertices;
-            GLenum mode;
-            GLuint vao, vbo;
+        std::vector<Vertex> getVertices() { return vertices; }
+
+      private:
+        std::vector<Vertex> vertices;
+        GLenum mode;
+        GLuint vao, vbo;
     };
 
     struct Shape {
         explicit Shape() {};
 
-        void add(VertexShape &shape) {
-            shapes.add(&shape);
-        }
+        void add(VertexShape &shape) { shapes.add(new VertexShape(shape)); }
 
         void draw(Attributes &attributes) {
-            for (auto * sp: shapes) {
+            for (auto *sp : shapes) {
                 sp->bind();
                 attributes.enable();
                 juce::gl::glDrawArrays(sp->getMode(), 0, sp->getVertices().size());
                 attributes.disable();
             }
-        } 
-        
+        }
+
         juce::OwnedArray<VertexShape> shapes;
     };
 };

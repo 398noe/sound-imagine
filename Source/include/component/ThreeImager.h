@@ -44,6 +44,7 @@ class ThreeImager : public juce::Component, public juce::OpenGLRenderer, private
 
     // mutex
     juce::CriticalSection mutex;
+    juce::CriticalSection shader_mutex;
     juce::CriticalSection matrix_mutex;
 
     // matrix
@@ -92,6 +93,6 @@ class ThreeImager : public juce::Component, public juce::OpenGLRenderer, private
     std::unique_ptr<OpenGLShader::Uniforms> uniforms;
     std::unique_ptr<OpenGLShader::Shape> shape;
     std::unique_ptr<OpenGLShader::VertexShape> vertex_shape;
-    std::vector<Vertex> vertices;
+    std::vector<OpenGLShader::Vertex> vertices;
     GLuint vao, vbo;
 };

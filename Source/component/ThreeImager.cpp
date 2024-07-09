@@ -19,21 +19,28 @@ ThreeImager::~ThreeImager() {
 }
 
 void ThreeImager::newOpenGLContextCreated() {
-    updateShaderProgram();
     initVertices();
+    updateShaderProgram();
 }
 
 void ThreeImager::updateShaderProgram() {
-    shader.reset(new juce::OpenGLShaderProgram(_context));
-    if (shader->addVertexShader(source.vertex) && shader->addFragmentShader(source.fragment) && shader->link()) {
+    const juce::ScopedLock lock(shader_mutex);
+    std::unique_ptr<juce::OpenGLShaderProgram> new_shader(new juce::OpenGLShaderProgram(_context));
+    if (new_shader->addVertexShader(source.vertex) && new_shader->addFragmentShader(source.fragment) && new_shader->link()) {
+        vertex_shape.reset();
         shape.reset();
         attributes.reset();
         uniforms.reset();
-    
-        // shader.reset(new_shader.release());
+
+        shader.reset(new_shader.release());
         shader->use();
-        
+
+        vertex_shape.reset(new OpenGLShader::VertexShape());
+        vertex_shape->init(vertices, juce::gl::GL_POINTS);
+
         shape.reset(new OpenGLShader::Shape());
+        shape->add(*vertex_shape);
+
         attributes.reset(new OpenGLShader::Attributes(*shader));
         uniforms.reset(new OpenGLShader::Uniforms(*shader));
     } else {
@@ -42,6 +49,9 @@ void ThreeImager::updateShaderProgram() {
 }
 
 void ThreeImager::initVertices() {
+    vertices = {{{1.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
+                {{0.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
+                {{0.0f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}};
 }
 
 void ThreeImager::openGLContextClosing() {
@@ -54,9 +64,9 @@ void ThreeImager::openGLContextClosing() {
 void ThreeImager::renderOpenGL() {
     const juce::ScopedLock lock(mutex);
     jassert(juce::OpenGLHelpers::isContextActive());
-    
+
     juce::OpenGLHelpers::clear(juce::Colours::black);
-    
+
     updateShaderProgram();
 
     // enable z buffer
@@ -139,16 +149,15 @@ void ThreeImager::setVertices() {
     }
 }
 
-void ThreeImager::updateBuffer() {
-}
+void ThreeImager::updateBuffer() {}
 
 void ThreeImager::timerCallback() {
     // fftの結果を取得
     fft_data = manager->getFFTResult();
     fft_freq = manager->getFFTFreqs();
     // verticesの更新
-    setVertices();
-    updateBuffer();
+    // setVertices();
+    // updateBuffer();
     repaint();
 }
 

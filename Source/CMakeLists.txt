@@ -20,9 +20,6 @@ juce_add_plugin("${PROJECT_NAME}"
 
 juce_generate_juce_header(${PROJECT_NAME})
 
-set(SHADER_FILES
-)
-
 target_sources(${PROJECT_NAME}
     PRIVATE
         lib/AudioUtilities.cpp
@@ -31,18 +28,20 @@ target_sources(${PROJECT_NAME}
         component/Imager.cpp
         component/LRImager.cpp
         component/ThreeImager.cpp
+        component/GLTest.cpp
         PluginProcessor.cpp
         PluginEditor.cpp
         include/lib/AudioUtilities.h
         include/lib/Constant.h
         include/lib/Manager.h
         include/lib/Processor.h
+        include/lib/Shader.h
         include/PluginProcessor.h
         include/PluginEditor.h
         include/component/Imager.h
         include/component/LRImager.h
         include/component/ThreeImager.h
-        # ${SHADER_FILES}
+        include/component/GLTest.h
 )
 
 target_include_directories("${PROJECT_NAME}"

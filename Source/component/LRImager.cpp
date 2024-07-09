@@ -72,4 +72,4 @@ void LRImager::timerCallback() {
     }
 };
 
-void LRImager::getDataForPaint() { fft_data = manager->getFFTResult(); };
+void LRImager::getDataForPaint() { fft_data = manager->getFFTResultMagnitude(); };

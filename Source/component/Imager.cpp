@@ -20,4 +20,4 @@ void Imager::timerCallback() {
     }
 }
 
-void Imager::getDataForPaint() { fft_data = manager->getFFTResult(); }
+void Imager::getDataForPaint() { fft_data = manager->getFFTResultMagnitude(); }

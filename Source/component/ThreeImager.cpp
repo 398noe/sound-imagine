@@ -20,11 +20,10 @@ ThreeImager::~ThreeImager() {
 
 void ThreeImager::newOpenGLContextCreated() {
     initVertices();
-    updateShaderProgram();
+    initShaderProgram();
 }
 
-void ThreeImager::updateShaderProgram() {
-    const juce::ScopedLock lock(shader_mutex);
+void ThreeImager::initShaderProgram() {
     std::unique_ptr<juce::OpenGLShaderProgram> new_shader(new juce::OpenGLShaderProgram(_context));
     if (new_shader->addVertexShader(source.vertex) && new_shader->addFragmentShader(source.fragment) && new_shader->link()) {
         vertex_shape.reset();
@@ -48,6 +47,14 @@ void ThreeImager::updateShaderProgram() {
     }
 }
 
+void ThreeImager::updateShader() {
+    const juce::ScopedLock lock(shader_mutex);
+    vertex_shape->update(vertices);
+
+    // shape.reset(new OpenGLShader::Shape());
+    // shape->add(*vertex_shape);
+}
+
 void ThreeImager::initVertices() {
     vertices = {{{1.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
                 {{0.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
@@ -67,7 +74,7 @@ void ThreeImager::renderOpenGL() {
 
     juce::OpenGLHelpers::clear(juce::Colours::black);
 
-    updateShaderProgram();
+    updateShader();
 
     // enable z buffer
     juce::gl::glEnable(juce::gl::GL_DEPTH_TEST);
@@ -136,6 +143,7 @@ void ThreeImager::updateProjectionMatrix() {
 }
 
 void ThreeImager::setVertices() {
+    juce::ScopedLock lock(shader_mutex);
     // fft_dataからverticesを更新する
     // verticesをリセットする
     vertices.clear();
@@ -149,14 +157,12 @@ void ThreeImager::setVertices() {
     }
 }
 
-void ThreeImager::updateBuffer() {}
-
 void ThreeImager::timerCallback() {
     // fftの結果を取得
     fft_data = manager->getFFTResult();
     fft_freq = manager->getFFTFreqs();
     // verticesの更新
-    // setVertices();
+    setVertices();
     // updateBuffer();
     repaint();
 }

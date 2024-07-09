@@ -86,6 +86,14 @@ struct OpenGLShader {
             juce::gl::glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(Vertex) * vertices.size(), vertices.data(), juce::gl::GL_DYNAMIC_DRAW);
         }
 
+        void update(std::vector<Vertex> v) {
+            this->vertices = v;
+
+            juce::gl::glBindVertexArray(vao);
+            juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);
+            juce::gl::glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(Vertex) * vertices.size(), vertices.data(), juce::gl::GL_DYNAMIC_DRAW);
+        }
+
         void bind() {
             juce::gl::glBindVertexArray(vao);
             juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, vbo);

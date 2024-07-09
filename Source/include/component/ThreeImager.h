@@ -31,10 +31,10 @@ class ThreeImager : public juce::Component, public juce::OpenGLRenderer, private
         float colour[4];
     };
 
-    void updateShaderProgram();
+    void initShaderProgram();
     void initVertices();
     void setVertices();
-    void updateBuffer();
+    void updateShader();
     void updateProjectionMatrix();
 
   private:

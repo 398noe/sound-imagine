@@ -77,7 +77,7 @@ struct OpenGLShader {
             this->mode = mode;
             juce::gl::glGenBuffers(1, &v_vbo);
             juce::gl::glBindBuffer(juce::gl::GL_ARRAY_BUFFER, v_vbo);
-            juce::gl::glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(Vertex), vertices, juce::gl::GL_STATIC_DRAW);            
+            juce::gl::glBufferData(juce::gl::GL_ARRAY_BUFFER, sizeof(Vertex), vertices, juce::gl::GL_STATIC_DRAW);
         }
 
         void bind() {

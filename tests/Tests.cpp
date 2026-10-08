@@ -15,7 +15,7 @@ void check(bool ok, const char* message)
 }
 const imagine::Band& strongest(const imagine::Snapshot& s)
 {
-    return *std::max_element(s.bands.begin(), s.bands.end(), [](const auto& a, const auto& b) { return a.levelDb < b.levelDb; });
+    return *std::max_element(s.bands.begin(), s.bands.begin()+s.numBands, [](const auto& a, const auto& b) { return a.levelDb < b.levelDb; });
 }
 double totalPower(const imagine::Snapshot& s)
 {
@@ -35,6 +35,13 @@ imagine::Snapshot tone(double sr, float gainR, double phase = 0, double frequenc
 }
 void coreTests()
 {
+    for (const int count : {32,64,128})
+    {
+        imagine::Analyzer a; a.reset(48000,13,250,count);
+        for (int i=0;i<24000;++i) {const float v=0.5f*std::sin(static_cast<float>(juce::MathConstants<double>::twoPi*1000*i/48000)); a.push(v,v);}
+        check(a.snapshot().numBands==count && std::abs(10*std::log10(totalPower(a.snapshot()))+9.0309)<0.02,"Band densities preserve calibrated integrated power");
+        for (int i=1;i<count;++i) check(a.snapshot().bands[static_cast<size_t>(i-1)].high==a.snapshot().bands[static_cast<size_t>(i)].low,"Band boundaries remain contiguous at every density");
+    }
     for (int order=11;order<=15;++order)
     {
         imagine::Analyzer configurable; configurable.reset(48000,order,50);
@@ -73,7 +80,7 @@ void coreTests()
         check(m.active && m.low < 1000 && m.high > 1000, "Tone is in the correct logarithmic band");
         check(std::abs(m.side) < 0.0001f && std::abs(m.correlation - 1) < 0.0001f, "Identical L/R gives zero Side and +1 correlation");
         check(std::abs(10 * std::log10(totalPower(mono)) + 9.0309) < 0.02, "Hann-normalized half-amplitude sine RMS is -9.03 dBFS");
-        check(mono.bands.back().high <= sr / 2 + 0.01, "Band limits follow Nyquist");
+        check(mono.bands[static_cast<size_t>(mono.numBands-1)].high <= sr / 2 + 0.01, "Band limits follow Nyquist");
         const auto inverse = tone(sr, -1); const auto& inv = strongest(inverse);
         check(inv.side > 0.9999f && inv.correlation < -0.9999f, "Inverse stereo gives 100% Side and -1 correlation");
         const auto oneSide = tone(sr, 0); const auto& o = strongest(oneSide);
@@ -106,7 +113,7 @@ void coreTests()
     for (int i = 0; i < 44100 * 6; ++i) decay.push(0, 0);
     check(!strongest(decay.snapshot()).active, "Silent input releases averaged power to the measurement floor");
 }
-void save(juce::AudioProcessorEditor& e, const juce::File& file)
+void save(juce::Component& e, const juce::File& file)
 {
     const auto image = e.createComponentSnapshot(e.getLocalBounds());
     auto out = file.createOutputStream(); check(out != nullptr, "Screenshot opens"); out->setPosition(0); out->truncate();
@@ -127,20 +134,21 @@ void pluginTests(const juce::File& directory)
     check(!p.isBusesLayoutSupported(mono), "Mismatched buses rejected");
     check(p.language.load()==1,"Japanese is the initial language");
     p.view.store(0); p.floorDb.store(-48); p.language.store(0);
-    p.fftOrderSetting.store(12); p.smoothingMs.store(50); p.levelMode.store(1);
+    p.fftOrderSetting.store(12); p.smoothingMs.store(50); p.levelMode.store(1); p.displayBands.store(64);
     auto savedCamera=imagine::Camera::aligned(0); savedCamera.zoom=1.4f; p.saveCamera(savedCamera);
     juce::MemoryBlock state; p.getStateInformation(state);
     auto restoredStorage = std::make_unique<SoundImagineProcessor>(); auto& restored = *restoredStorage;
     restored.setStateInformation(state.getData(), static_cast<int>(state.getSize()));
     check(restored.view.load() == 0 && restored.floorDb.load() == -48, "Settings survive session save/load");
     check(restored.fftOrderSetting.load()==12 && restored.smoothingMs.load()==50 && restored.levelMode.load()==1,"Analysis settings survive session save/load");
+    check(restored.displayBands.load()==64,"Display band count survives session save/load");
     check(restored.language.load()==0 && restored.readCamera().alignedAxis()==0 && std::abs(restored.readCamera().zoom-1.4f)<0.001f,
         "Language, orientation and zoom survive session save/load");
     const char invalid[] = "invalid"; restored.setStateInformation(invalid, sizeof(invalid));
     check(restored.view.load() == 0 && restored.floorDb.load() == -48, "Malformed state is ignored");
     p.view.store(1); p.getStateInformation(state); restored.setStateInformation(state.getData(),static_cast<int>(state.getSize()));
     check(restored.view.load()==0 && restored.readCamera().alignedAxis()==2,"Legacy Map state migrates to Z alignment");
-    p.view.store(0); p.fftOrderSetting.store(13); p.smoothingMs.store(250); p.levelMode.store(0);
+    p.view.store(0); p.fftOrderSetting.store(13); p.smoothingMs.store(250); p.levelMode.store(0); p.displayBands.store(32);
     p.prepareToPlay(96000, 257); check(p.readSnapshot().frames == 0 && p.readSnapshot().sampleRate == 96000, "Reprepare clears FIFO and sample rate");
     p.prepareToPlay(48000, 257); p.view.store(0); p.floorDb.store(-72); p.saveCamera(imagine::Camera::home());
     for (int block = 0; block < 130; ++block)
@@ -225,11 +233,32 @@ void pluginTests(const juce::File& directory)
     for (auto* child : editor->getChildren())
         if (auto* button = dynamic_cast<juce::TextButton*>(child); button && button->getButtonText() == "||") freezeButton = button;
     check(freezeButton != nullptr, "Freeze control exists"); freezeButton->onClick();
+    const auto graphSize=editor->getBounds();
+    for (auto* child : editor->getChildren())
+        if (auto* button=dynamic_cast<juce::TextButton*>(child); button && button->getButtonText()=="=") button->onClick();
+    juce::DocumentWindow* measurements=nullptr;
+    for (int i=0;i<juce::Desktop::getInstance().getNumComponents();++i)
+        if (auto* window=dynamic_cast<juce::DocumentWindow*>(juce::Desktop::getInstance().getComponent(i)); window && window->getName()=="All bands") measurements=window;
+    check(measurements!=nullptr && editor->getBounds()==graphSize,"All-band window opens without resizing the graph");
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
+    save(*measurements->getContentComponent(),directory.getChildFile("all-bands.png"));
+    p.language.store(1); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
+    save(*measurements->getContentComponent(),directory.getChildFile("all-bands-ja.png"));
+    p.language.store(0); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
+    juce::TableListBox* measurementTable=nullptr;
+    for (auto* child : measurements->getContentComponent()->getChildren())
+        if (auto* table=dynamic_cast<juce::TableListBox*>(child)) measurementTable=table;
+    check(measurementTable && measurementTable->getTableListBoxModel()->getNumRows()==p.readSnapshot().numBands,"All-band table contains every measurement point");
+    const auto frozenTable=measurements->getContentComponent()->createComponentSnapshot(measurements->getContentComponent()->getLocalBounds());
     const auto frozenImage = editor->createComponentSnapshot(editor->getLocalBounds());
     juce::AudioBuffer<float> silence(2,257); silence.clear();
     for (int block = 0; block < 80; ++block) { p.processBlock(silence,midi); juce::Thread::sleep(2); }
     juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
     const auto heldImage = editor->createComponentSnapshot(editor->getLocalBounds());
+    const auto heldTable=measurements->getContentComponent()->createComponentSnapshot(measurements->getContentComponent()->getLocalBounds());
+    for (int y=30;y<heldTable.getHeight()-26;++y) for (int x=0;x<heldTable.getWidth()-20;++x)
+        check(frozenTable.getPixelAt(x,y)==heldTable.getPixelAt(x,y),"Freeze holds all-band measurements together with the graph");
+    measurements->closeButtonPressed(); check(!measurements->isVisible(),"All-band window can be closed independently");
     for (int y = 100; y < 490; ++y) for (int x = 30; x < 860; ++x)
         check(frozenImage.getPixelAt(x,y) == heldImage.getPixelAt(x,y), "Freeze holds measured plot while new audio is analyzed");
     freezeButton->onClick(); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
@@ -250,6 +279,13 @@ void pluginTests(const juce::File& directory)
         for (int block=0;block<180;++block) {p.processBlock(audio,midi); juce::Thread::sleep(2);}
         juce::Thread::sleep(30);
         check(p.readSnapshot().fftPoints==(1<<order) && p.readSnapshot().frames>0,"Worker applies FFT size changes during playback and resumes analysis");
+    }
+    for (const int bands : {64,128,32})
+    {
+        p.fftOrderSetting.store(11); p.displayBands.store(bands); juce::Thread::sleep(30);
+        for (int block=0;block<40;++block) {p.processBlock(audio,midi); juce::Thread::sleep(2);}
+        juce::Thread::sleep(30);
+        check(p.readSnapshot().numBands==bands && p.readSnapshot().frames>0,"Worker applies band density changes during playback");
     }
     p.releaseResources();
     auto monoStorage = std::make_unique<SoundImagineProcessor>(); auto& monoProcessor = *monoStorage;

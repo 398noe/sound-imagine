@@ -7,13 +7,14 @@ Analyzer::Analyzer()
 {
     reset(48000);
 }
-void Analyzer::reset(double sr, int order, int smoothingMs)
+void Analyzer::reset(double sr, int order, int smoothingMs, int bands)
 {
     order = std::clamp(order,11,15);
     if (order != currentOrder) { fft=std::make_unique<juce::dsp::FFT>(order); currentOrder=order; }
     size=1<<order; step=size/4;
     result = {}; result.sampleRate = std::isfinite(sr) && sr >= 8000 ? sr : 48000;
     result.fftPoints=size;
+    result.numBands=bands==64 || bands==128 ? bands : 32;
     result.averagingMs=std::clamp(smoothingMs,50,1000);
     window.resize(static_cast<size_t>(size)); windowEnergy=0;
     for (int i=0;i<size;++i)
@@ -26,11 +27,11 @@ void Analyzer::reset(double sr, int order, int smoothingMs)
     position = collected = hop = 0;
     retention = std::exp(-step / (result.sampleRate * result.averagingMs*0.001));
     const double upper = std::min(20000.0, result.sampleRate / 2);
-    for (int b = 0; b < bandCount; ++b)
+    for (int b = 0; b < result.numBands; ++b)
     {
         auto& band = result.bands[static_cast<size_t>(b)];
-        band.low = static_cast<float>(20 * std::pow(upper / 20, static_cast<double>(b) / bandCount));
-        band.high = static_cast<float>(20 * std::pow(upper / 20, static_cast<double>(b + 1) / bandCount));
+        band.low = static_cast<float>(20 * std::pow(upper / 20, static_cast<double>(b) / result.numBands));
+        band.high = static_cast<float>(20 * std::pow(upper / 20, static_cast<double>(b + 1) / result.numBands));
     }
 }
 bool Analyzer::push(float l, float r)
@@ -54,7 +55,7 @@ void Analyzer::analyse()
     }
     fft->performRealOnlyForwardTransform(spectrumL.data(), true);
     fft->performRealOnlyForwardTransform(spectrumR.data(), true);
-    std::array<Power, bandCount> current {};
+    std::array<Power, maxBands> current {};
     const double binHz = result.sampleRate / size;
     const double scale = 1.0 / (size * windowEnergy);
     for (int k = 1; k <= size / 2; ++k)
@@ -62,7 +63,7 @@ void Analyzer::analyse()
         const auto idx = static_cast<size_t>(2 * k);
         const double lr = spectrumL[idx], li = spectrumL[idx + 1], rr = spectrumR[idx], ri = spectrumR[idx + 1];
         const double factor = scale * (k == size / 2 ? 1.0 : 2.0);
-        for (int b = 0; b < bandCount; ++b)
+        for (int b = 0; b < result.numBands; ++b)
         {
             const auto& band = result.bands[static_cast<size_t>(b)];
             const double overlap = std::max(0.0, std::min(static_cast<double>(band.high), (k + 0.5) * binHz)
@@ -75,7 +76,7 @@ void Analyzer::analyse()
             p.cross += (lr * rr + li * ri) * weight;
         }
     }
-    for (int b = 0; b < bandCount; ++b)
+    for (int b = 0; b < result.numBands; ++b)
     {
         const auto idx = static_cast<size_t>(b);
         auto& p = powers[idx]; const auto& c = current[idx]; auto& band = result.bands[idx];

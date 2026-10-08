@@ -46,5 +46,8 @@ private:
     juce::Rectangle<float> plot;
     int selected = 18;
     bool frozen = false, showHelp = false, stale = true;
+    OverlayButton tableButton { "=" };
+    void showTable();
+    std::unique_ptr<juce::DocumentWindow> tableWindow;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SoundImagineEditor)
 };

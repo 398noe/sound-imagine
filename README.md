@@ -1,5 +1,10 @@
 # sound-imagine
 
+Sound Imagine is audio analyzer for mixing.
+
+## About
+Sound Imagine performs an FFT on the input audio and plots the frequency, Mid-Side, and L-R components in 3D space to characterize the sound source.
+
 ミキシング・マスタリング用のステレオ解析プラグイン。周波数帯域ごとの **レベル・Sideエネルギー・左右相関・左右バランス** を表示します。音声はビット単位でそのまま通過し、追加レイテンシーは0です。
 
 旧版のFFT・描画・ビルド構成を置き換えた2.0です。Windows x64 / VST3と、確認用Standaloneをビルドします。旧版と同じプラグインID（Nyao / Imag）を維持しています。旧版には保存パラメータがなかったため、新しい表示設定は既定値で開始します。
@@ -79,4 +84,9 @@ CTestはDAW内の実機テストを代替しません。実際のホストで読
 
 ## ライセンス
 
+This program uses the [JUCE framework](https://github.com/juce-framework/JUCE/blob/master/LICENSE.md) and is licensed under [AGPL v3.0](https://www.gnu.org/licenses/agpl-3.0.en.html) .
+
 このリポジトリは [AGPL-3.0](LICENSE)。JUCEの利用条件は [固定バージョンのライセンス](https://github.com/juce-framework/JUCE/blob/8.0.15/LICENSE.md) を参照してください。
+
+## Contribute
+There are many features that need to be added to this program. We need your help to make this program even better. Issues and Pull Requests are welcome <3

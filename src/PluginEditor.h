@@ -47,7 +47,7 @@ private:
     juce::Point<float> dragStart;
     int alignedAxis = -1, lastLanguage = -1;
     bool dragging = false;
-    OverlayButton quadButton { "4" };
+    OverlayButton quadButton { "1" };
     juce::Rectangle<float> plot;
     int selected = 18;
     bool frozen = false, showHelp = false, stale = true;

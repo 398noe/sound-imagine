@@ -69,19 +69,47 @@ void coreTests()
     const auto original=orbit.transform({0.3f,0.7f,-0.4f});
     orbit.orbit(0,0,0.4f,0.2f);
     const auto rotated=orbit.transform({0.3f,0.7f,-0.4f});
-    check(std::abs(rotated.x-original.x)>0.01f,"Trackball changes the view");
+    check(std::abs(rotated.x-original.x)>0.01f,"Yaw and pitch drag changes the view");
     check(std::abs(rotated.x*rotated.x+rotated.y*rotated.y+rotated.z*rotated.z-0.74f)<1.e-5f,"Rotation preserves spatial lengths");
     for (int i=0;i<1000;++i) orbit.orbit(0.2f,-0.2f,0.21f,-0.19f);
     check(std::abs(orbit.w*orbit.w+orbit.x*orbit.x+orbit.y*orbit.y+orbit.z*orbit.z-1)<1.e-5f,"Repeated orbit stays normalized");
-    orbit.orbit(-2,0,2,0); check(std::isfinite(orbit.w),"Antipodal trackball drag is finite");
-    const float scale=imagine::Camera::home().projectionScale(800,500);
-    for (int i=0;i<100;++i)
+    const auto sameRotation=[](const imagine::Camera& a,const imagine::Camera& b)
     {
-        orbit.orbit(0,0,0.013f,0.021f);
-        check(std::abs(orbit.projectionScale(800,500)-scale)<1.e-4f,"Free rotation keeps a constant uniform projection scale");
+        const auto u=a.transform({0.3f,0.7f,-0.4f}),v=b.transform({0.3f,0.7f,-0.4f});
+        return std::abs(u.x-v.x)<1.e-5f && std::abs(u.y-v.y)<1.e-5f && std::abs(u.z-v.z)<1.e-5f;
+    };
+    auto centre=imagine::Camera::home(),edge=centre;
+    centre.orbit(0,0,0.3f,0.2f); edge.orbit(-0.7f,0.9f,-0.4f,1.1f);
+    check(sameRotation(centre,edge),"Drag start position does not change the rotation axes or sensitivity");
+    auto multiTurn=imagine::Camera::home(),quarterTurn=multiTurn;
+    multiTurn.orbit(0,0,2.25f,0); quarterTurn.orbit(0,0,0.25f,0);
+    check(sameRotation(multiTurn,quarterTurn),"Long horizontal drags continue through multiple complete rotations");
+    auto incremental=imagine::Camera::home();
+    for (int i=0;i<45;++i) incremental.orbit(0,0,0.05f,0);
+    check(sameRotation(incremental,multiTurn),"Continuous horizontal rotation does not depend on event spacing");
+    auto horizontal=imagine::Camera::home(),vertical=horizontal;
+    const auto before=horizontal.transform({0.3f,0.7f,-0.4f});
+    horizontal.orbit(0,0,0.31f,0); vertical.orbit(0,0,0,0.31f);
+    check(std::abs(horizontal.transform({0.3f,0.7f,-0.4f}).y-before.y)<1.e-5f,"Horizontal drag rotates about the screen vertical axis");
+    check(std::abs(vertical.transform({0.3f,0.7f,-0.4f}).x-before.x)<1.e-5f,"Vertical drag rotates about the screen horizontal axis");
+    auto nearTurn=imagine::Camera::home(),afterTurn=nearTurn;
+    nearTurn.orbit(0,0,0.999f,0); afterTurn.orbit(0,0,1.001f,0);
+    const auto nearPoint=nearTurn.transform({1,0,0}),afterPoint=afterTurn.transform({1,0,0});
+    check(std::abs(nearPoint.x-afterPoint.x)+std::abs(nearPoint.y-afterPoint.y)+std::abs(nearPoint.z-afterPoint.z)<0.03f,
+        "Rotation stays continuous as a drag passes a complete turn");
+    for (const auto view : {imagine::Camera::home(),imagine::Camera::aligned(0),imagine::Camera::aligned(1),imagine::Camera::aligned(2),multiTurn})
+    {
+        const auto scale=view.projectionScale(800,500);
+        float minX=1.e9f,maxX=-1.e9f,minY=1.e9f,maxY=-1.e9f;
+        for (const float x : {-1.f,1.f}) for (const float y : {-0.7f,0.7f}) for (const float z : {-0.7f,0.7f})
+        {
+            const auto q=view.transform({x,y,z});
+            minX=std::min(minX,q.x*scale.x); maxX=std::max(maxX,q.x*scale.x);
+            minY=std::min(minY,q.y*scale.y); maxY=std::max(maxY,q.y*scale.y);
+        }
+        check(std::abs(maxX-minX-800)<0.001f && std::abs(maxY-minY-500)<0.001f,
+            "Free and axis views retain the full viewport width and height");
     }
-    const auto rimA=imagine::Camera::sphere(0.999f,0),rimB=imagine::Camera::sphere(1.001f,0);
-    check(std::abs(rimA.z-rimB.z)<0.003f,"Trackball motion remains smooth across the old sphere rim");
     for (const double sr : { 32000., 44100., 48000., 96000., 192000. })
     {
         const auto mono = tone(sr, 1); const auto& m = strongest(mono);
@@ -199,6 +227,21 @@ void pluginTests(const juce::File& directory)
             juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | (shift ? juce::ModifierKeys::shiftModifier : 0)),1,0,0,0,0,editor.get(),editor.get(),
             juce::Time::getCurrentTime(),{450,340},juce::Time::getCurrentTime(),1,true);
     };
+    const auto sameOrientation=[](const imagine::Camera& a,const imagine::Camera& b)
+    {
+        return std::abs(a.w-b.w)<1.e-5f && std::abs(a.x-b.x)<1.e-5f && std::abs(a.y-b.y)<1.e-5f && std::abs(a.z-b.z)<1.e-5f;
+    };
+    interactive->mouseDown(makeMouse({200,180})); interactive->mouseDrag(makeMouse({260,210}));
+    const auto cornerDrag=p.readCamera();
+    interactive->mouseDoubleClick(makeMouse({450,340}));
+    interactive->mouseDown(makeMouse({450,340})); interactive->mouseDrag(makeMouse({510,370}));
+    check(sameOrientation(cornerDrag,p.readCamera()),"Actual editor rotation is independent of drag start position");
+    interactive->mouseDoubleClick(makeMouse({450,340}));
+    interactive->mouseDown(makeMouse({450,340})); interactive->mouseDrag(makeMouse({650,340}));
+    const auto quarterDrag=p.readCamera();
+    interactive->mouseDrag(makeMouse({2250,340}));
+    check(sameOrientation(quarterDrag,p.readCamera()),"Actual editor continues rotating when a drag extends beyond the viewport");
+    interactive->mouseDoubleClick(makeMouse({450,340}));
     for (auto* child : editor->getChildren())
         if (auto* button=dynamic_cast<OverlayButton*>(child); button && button->getButtonText()=="X")
         {
@@ -249,17 +292,25 @@ void pluginTests(const juce::File& directory)
     save(*editor,directory.getChildFile("3d-ja.png"));
     juce::TextButton* quadButton=nullptr;
     for (auto* child : editor->getChildren())
-        if (auto* button=dynamic_cast<juce::TextButton*>(child); button && button->getButtonText()=="4") quadButton=button;
+        if (auto* button=dynamic_cast<juce::TextButton*>(child); button && button->getButtonText()=="1") quadButton=button;
     check(quadButton!=nullptr,"Four-view control exists"); quadButton->onClick();
     check(p.quadView.load(),"Four-view control enables the layout");
+    check(quadButton->getButtonText()=="4","Four-view layout displays 4 on its control");
+    quadButton->onClick(); check(!p.quadView.load() && quadButton->getButtonText()=="1","Single view displays 1 on its control");
+    quadButton->onClick();
     interactive->mouseDown(makeMouse({220,170}));
     const auto quadBefore=editor->createComponentSnapshot(editor->getLocalBounds());
     interactive->mouseDrag(makeMouse({250,185}));
-    interactive->mouseDown(makeMouse({220,170},true)); interactive->mouseDrag(makeMouse({235,180},true));
     const auto quadAfter=editor->createComponentSnapshot(editor->getLocalBounds());
     check(std::abs(p.readCamera().x-imagine::Camera::home().x)>0.01f,"Top-left viewport rotates in four-view mode");
-    for (int y=45;y<620;++y) for (int x=460;x<875;++x)
-        check(quadBefore.getPixelAt(x,y)==quadAfter.getPixelAt(x,y),"Axis viewports stay fixed while the free viewport rotates");
+    for (int y=45;y<620;++y) for (int x=12;x<875;++x)
+        if (x>=454 || y>=337) check(quadBefore.getPixelAt(x,y)==quadAfter.getPixelAt(x,y),"All three axis viewports stay fixed while the free viewport rotates");
+    interactive->mouseDown(makeMouse({220,170},true));
+    const auto beforeQuadPan=editor->createComponentSnapshot(editor->getLocalBounds());
+    interactive->mouseDrag(makeMouse({235,180},true));
+    const auto afterQuadPan=editor->createComponentSnapshot(editor->getLocalBounds());
+    for (int y=45;y<620;++y) for (int x=12;x<875;++x)
+        if (x>=454 || y>=337) check(beforeQuadPan.getPixelAt(x,y)==afterQuadPan.getPixelAt(x,y),"All three axis viewports stay fixed while the free viewport pans");
     const auto freeCamera=p.readCamera();
     interactive->mouseDown(makeMouse({670,170})); interactive->mouseDrag(makeMouse({700,190}));
     interactive->mouseWheelMove(makeMouse({670,170}),wheel);
@@ -271,6 +322,13 @@ void pluginTests(const juce::File& directory)
     }
     editor.reset(p.createEditor()); interactive=dynamic_cast<SoundImagineEditor*>(editor.get());
     check(p.quadView.load(),"Editor reopening keeps the four-view layout");
+    juce::TextButton* restoredQuadButton=nullptr;
+    for (auto* child : editor->getChildren())
+        if (auto* button=dynamic_cast<juce::TextButton*>(child); button && button->getButtonText()=="4") restoredQuadButton=button;
+    check(restoredQuadButton!=nullptr,"Reopened four-view editor immediately displays 4");
+    for (auto* child : editor->getChildren())
+        if (auto* button=dynamic_cast<juce::TextButton*>(child); button && button->getButtonText()=="Y") button->onClick();
+    check(!p.quadView.load() && restoredQuadButton->getButtonText()=="1","Axis alignment immediately returns the layout control to 1");
     p.quadView.store(false); p.saveCamera(imagine::Camera::home()); editor->setSize(900,700);
     juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
     for (auto* child : editor->getChildren())

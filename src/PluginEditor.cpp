@@ -127,6 +127,7 @@ SoundImagineEditor::SoundImagineEditor(SoundImagineProcessor& p) : AudioProcesso
     quadButton.onClick=[this]
     {
         processor.quadView.store(!processor.quadView.load());
+        quadButton.setButtonText(processor.quadView.load() ? "4" : "1");
         quadButton.setToggleState(processor.quadView.load(),juce::dontSendNotification);
         if (processor.quadView.load() && camera.alignedAxis()>=0) home.onClick();
         dragging=false; resized(); repaint();
@@ -148,7 +149,7 @@ void SoundImagineEditor::updateLanguage()
     axisX.setTooltip(tr("Side vs level (frequency hidden)","Mid / Sideと強さ（周波数は重なる）"));
     axisY.setTooltip(tr("Frequency vs level (Side hidden)","周波数と強さ（Sideは重なる）"));
     axisZ.setTooltip(tr("Frequency vs Side (level hidden)","周波数とMid / Side（強さは重なる）"));
-    quadButton.setTooltip(tr("Four views: free / X / Y / Z", "4分割：自由視点 / X / Y / Z"));
+    quadButton.setTooltip(tr("Switch single / four views: free / X / Y / Z", "1画面 / 4分割を切り替え：自由視点 / X / Y / Z"));
     setTooltip(tr("Drag to rotate; Shift-drag to pan; wheel to zoom", "ドラッグで回転、Shift＋ドラッグで平行移動、ホイールで拡大縮小"));
     home.setTooltip(tr("Reset camera","視点をリセット")); freeze.setTooltip(tr("Freeze measurements","測定値の表示を保持"));
     settings.setTooltip(tr("FFT / averaging / level / language","FFT・平均化・レベル表示・言語")); help.setTooltip(tr("Reading the graph","グラフの読み方"));
@@ -200,6 +201,7 @@ void SoundImagineEditor::timerCallback()
     camera=processor.readCamera(); alignedAxis=camera.alignedAxis();
     plot=plotFor(0);
     quadButton.setToggleState(processor.quadView.load(),juce::dontSendNotification);
+    quadButton.setButtonText(processor.quadView.load() ? "4" : "1");
     axisX.setToggleState(alignedAxis==0,juce::dontSendNotification); axisY.setToggleState(alignedAxis==1,juce::dontSendNotification); axisZ.setToggleState(alignedAxis==2,juce::dontSendNotification);
     if (tableWindow && tableWindow->isVisible())
     {
@@ -210,7 +212,7 @@ void SoundImagineEditor::timerCallback()
 }
 void SoundImagineEditor::align(int axis)
 {
-    processor.quadView.store(false); quadButton.setToggleState(false,juce::dontSendNotification); dragging=false; resized();
+    processor.quadView.store(false); quadButton.setToggleState(false,juce::dontSendNotification); quadButton.setButtonText("1"); dragging=false; resized();
     camera=imagine::Camera::aligned(axis); alignedAxis=axis; processor.saveCamera(camera); repaint();
 }
 float SoundImagineEditor::level(const imagine::Band& b) const
@@ -248,9 +250,9 @@ int SoundImagineEditor::viewportAt(juce::Point<float> p) const
 juce::Point<float> SoundImagineEditor::screen(imagine::Vec3 v,const imagine::Camera& viewCamera,juce::Rectangle<float> area) const
 {
     const auto q=viewCamera.transform(v);
-    const float scale=viewCamera.projectionScale(area.getWidth(),area.getHeight());
-    return {area.getCentreX()+q.x*scale+viewCamera.panX*area.getWidth(),
-            area.getCentreY()-q.y*scale+viewCamera.panY*area.getHeight()};
+    const auto scale=viewCamera.projectionScale(area.getWidth(),area.getHeight());
+    return {area.getCentreX()+q.x*scale.x+viewCamera.panX*area.getWidth(),
+            area.getCentreY()-q.y*scale.y+viewCamera.panY*area.getHeight()};
 }
 juce::Point<float> SoundImagineEditor::project(float f,float side,float db,const imagine::Camera& viewCamera,juce::Rectangle<float> area) const
 {
@@ -416,7 +418,7 @@ void SoundImagineEditor::mouseDown(const juce::MouseEvent& e)
 }
 void SoundImagineEditor::mouseDrag(const juce::MouseEvent& e)
 {
-    if (!dragging) return; const float radius=std::min(plot.getWidth(),plot.getHeight())*0.5f;
+    if (!dragging) return;
     if (e.mods.isShiftDown())
     {
         camera=dragCamera;
@@ -424,8 +426,9 @@ void SoundImagineEditor::mouseDrag(const juce::MouseEvent& e)
         camera.panY+=(e.position.y-dragStart.y)/plot.getHeight();
         processor.saveCamera(camera); repaint(); return;
     }
-    const auto from=(dragStart-plot.getCentre())/radius,to=(e.position-plot.getCentre())/radius;
-    camera=dragCamera; camera.orbit(from.x,-from.y,to.x,-to.y); alignedAxis=-1; processor.saveCamera(camera); repaint();
+    const auto delta=e.position-dragStart;
+    camera=dragCamera; camera.orbit(0,0,delta.x/plot.getWidth(),-delta.y/plot.getHeight());
+    alignedAxis=-1; processor.saveCamera(camera); repaint();
 }
 void SoundImagineEditor::mouseWheelMove(const juce::MouseEvent& e,const juce::MouseWheelDetails& wheel)
 {

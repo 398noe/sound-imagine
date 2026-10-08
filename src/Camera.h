@@ -54,35 +54,23 @@ struct Camera
         for (int i=0;i<3;++i) if (std::abs(transform(axes[static_cast<size_t>(i)]).z)>0.99999f) return i;
         return -1;
     }
-    static Vec3 sphere(float px, float py)
+    Vec3 projectionScale(float width, float height) const
     {
-        const float r = px*px+py*py;
-        // A hyperbolic continuation avoids the abrupt rim of a virtual sphere.
-        const float pz = r <= 0.5f ? std::sqrt(1-r) : 0.5f/std::sqrt(r);
-        const float n = std::sqrt(r+pz*pz); return { px/n,py/n,pz/n };
-    }
-    float projectionScale(float width, float height) const
-    {
-        // Keep a rigid, constant scale during orbit. The bounding sphere fits
-        // every rotation; fixed axis views can use their visible plane's span.
-        if (alignedAxis() < 0) return std::min(width,height)*zoom/std::sqrt(7.92f);
+        // Fit each display dimension independently, including the wide axis views.
         const auto a=transform({2,0,0}),b=transform({0,1.4f,0}),c=transform({0,0,1.4f});
-        return std::min(width/(std::abs(a.x)+std::abs(b.x)+std::abs(c.x)),
-                        height/(std::abs(a.y)+std::abs(b.y)+std::abs(c.y)))*zoom;
+        return {width*zoom/std::max(0.01f,std::abs(a.x)+std::abs(b.x)+std::abs(c.x)),
+                height*zoom/std::max(0.01f,std::abs(a.y)+std::abs(b.y)+std::abs(c.y)),0};
     }
     void orbit(float fromX, float fromY, float toX, float toY)
     {
-        const auto a=sphere(fromX,fromY), b=sphere(toX,toY);
-        Camera delta;
-        delta.w=1+a.x*b.x+a.y*b.y+a.z*b.z;
-        delta.x=a.y*b.z-a.z*b.y; delta.y=a.z*b.x-a.x*b.z; delta.z=a.x*b.y-a.y*b.x;
-        if (delta.w < 0.00001f) // Antipodal trackball endpoints: choose a perpendicular axis.
-        {
-            delta.w=0;
-            if (std::abs(a.x)<0.9f) { delta.x=0; delta.y=a.z; delta.z=-a.y; }
-            else { delta.x=-a.z; delta.y=0; delta.z=a.x; }
-        }
-        delta.normalise(); *this=multiply(delta,*this);
+        // Displacement controls angles about fixed screen axes. No virtual
+        // sphere, position-dependent roll, or limit on the number of turns.
+        constexpr float pi=3.14159265358979323846f;
+        const float yawAngle=(toX-fromX)*pi,pitchAngle=-(toY-fromY)*pi;
+        Camera yaw,pitch;
+        yaw.w=std::cos(yawAngle); yaw.y=std::sin(yawAngle);
+        pitch.w=std::cos(pitchAngle); pitch.x=std::sin(pitchAngle);
+        *this=multiply(pitch,multiply(yaw,*this));
     }
 };
 }

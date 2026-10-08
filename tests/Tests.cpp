@@ -74,6 +74,14 @@ void coreTests()
     for (int i=0;i<1000;++i) orbit.orbit(0.2f,-0.2f,0.21f,-0.19f);
     check(std::abs(orbit.w*orbit.w+orbit.x*orbit.x+orbit.y*orbit.y+orbit.z*orbit.z-1)<1.e-5f,"Repeated orbit stays normalized");
     orbit.orbit(-2,0,2,0); check(std::isfinite(orbit.w),"Antipodal trackball drag is finite");
+    const float scale=imagine::Camera::home().projectionScale(800,500);
+    for (int i=0;i<100;++i)
+    {
+        orbit.orbit(0,0,0.013f,0.021f);
+        check(std::abs(orbit.projectionScale(800,500)-scale)<1.e-4f,"Free rotation keeps a constant uniform projection scale");
+    }
+    const auto rimA=imagine::Camera::sphere(0.999f,0),rimB=imagine::Camera::sphere(1.001f,0);
+    check(std::abs(rimA.z-rimB.z)<0.003f,"Trackball motion remains smooth across the old sphere rim");
     for (const double sr : { 32000., 44100., 48000., 96000., 192000. })
     {
         const auto mono = tone(sr, 1); const auto& m = strongest(mono);
@@ -135,13 +143,16 @@ void pluginTests(const juce::File& directory)
     check(p.language.load()==1,"Japanese is the initial language");
     p.view.store(0); p.floorDb.store(-48); p.language.store(0);
     p.fftOrderSetting.store(12); p.smoothingMs.store(50); p.levelMode.store(1); p.displayBands.store(64);
-    auto savedCamera=imagine::Camera::aligned(0); savedCamera.zoom=1.4f; p.saveCamera(savedCamera);
+    auto savedCamera=imagine::Camera::aligned(0); savedCamera.zoom=1.4f; savedCamera.panX=0.2f; savedCamera.panY=-0.1f; p.saveCamera(savedCamera);
     juce::MemoryBlock state; p.getStateInformation(state);
     auto restoredStorage = std::make_unique<SoundImagineProcessor>(); auto& restored = *restoredStorage;
     restored.setStateInformation(state.getData(), static_cast<int>(state.getSize()));
     check(restored.view.load() == 0 && restored.floorDb.load() == -48, "Settings survive session save/load");
     check(restored.fftOrderSetting.load()==12 && restored.smoothingMs.load()==50 && restored.levelMode.load()==1,"Analysis settings survive session save/load");
     check(restored.displayBands.load()==64,"Display band count survives session save/load");
+    check(std::abs(restored.readCamera().panX-0.2f)<0.001f && std::abs(restored.readCamera().panY+0.1f)<0.001f,"Camera pan survives session save/load");
+    p.quadView.store(true); p.getStateInformation(state); restored.setStateInformation(state.getData(),static_cast<int>(state.getSize()));
+    check(restored.quadView.load(),"Four-view layout survives session save/load"); p.quadView.store(false);
     check(restored.language.load()==0 && restored.readCamera().alignedAxis()==0 && std::abs(restored.readCamera().zoom-1.4f)<0.001f,
         "Language, orientation and zoom survive session save/load");
     const char invalid[] = "invalid"; restored.setStateInformation(invalid, sizeof(invalid));
@@ -182,10 +193,10 @@ void pluginTests(const juce::File& directory)
     editor->setSize(900,700);
     auto* interactive=dynamic_cast<SoundImagineEditor*>(editor.get());
     check(interactive!=nullptr,"Interactive editor is available");
-    const auto makeMouse=[&](juce::Point<float> position)
+    const auto makeMouse=[&](juce::Point<float> position,bool shift=false)
     {
         return juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(),position,
-            juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier),1,0,0,0,0,editor.get(),editor.get(),
+            juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | (shift ? juce::ModifierKeys::shiftModifier : 0)),1,0,0,0,0,editor.get(),editor.get(),
             juce::Time::getCurrentTime(),{450,340},juce::Time::getCurrentTime(),1,true);
     };
     for (auto* child : editor->getChildren())
@@ -201,9 +212,17 @@ void pluginTests(const juce::File& directory)
     interactive->mouseWheelMove(makeMouse({450,340}),wheel);
     check(p.readCamera().zoom>1.2f,"Wheel zoom updates the actual editor camera");
     save(*editor,directory.getChildFile("rotated.png"));
+    const auto beforePan=p.readCamera();
+    interactive->mouseDown(makeMouse({450,340},true)); interactive->mouseDrag(makeMouse({490,365},true));
+    const auto afterPan=p.readCamera();
+    check(afterPan.x==beforePan.x && afterPan.y==beforePan.y && afterPan.z==beforePan.z && afterPan.w==beforePan.w && afterPan.zoom==beforePan.zoom,
+        "Shift-drag preserves rotation and zoom");
+    check(afterPan.panX>beforePan.panX && afterPan.panY>beforePan.panY,"Shift-drag pans the graph in the drag direction");
+    save(*editor,directory.getChildFile("panned.png"));
     interactive->mouseDoubleClick(makeMouse({450,340}));
     check(std::abs(p.readCamera().zoom-1)<0.001f && std::abs(p.readCamera().x-imagine::Camera::home().x)<0.001f,
         "Double-click resets orientation and zoom");
+    check(p.readCamera().panX==0 && p.readCamera().panY==0,"Double-click resets pan");
     for (auto* child : editor->getChildren())
         if (auto* button=dynamic_cast<juce::TextButton*>(child); button && button->getButtonText()=="X")
         { button->onClick(); check(p.readCamera().alignedAxis()==0,"X alignment control changes the persisted camera"); }
@@ -212,10 +231,48 @@ void pluginTests(const juce::File& directory)
         p.saveCamera(imagine::Camera::aligned(axis)); p.language.store(1);
         juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
         save(*editor,directory.getChildFile("axis-"+juce::String(axis)+"-ja.png"));
+        if (axis==0)
+        {
+            const auto image=editor->createComponentSnapshot(editor->getLocalBounds());
+            int gridPixels=0;
+            for (int x=240;x<670;++x)
+            {
+                bool visible=false;
+                for (int y=327;y<=332;++y) visible=visible || image.getPixelAt(x,y)!=juce::Colour(0xff11191f);
+                if (visible) ++gridPixels;
+            }
+            check(gridPixels>350,"X view draws level grid lines across the Side plane");
+        }
     }
     p.saveCamera(imagine::Camera::home());
     juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
     save(*editor,directory.getChildFile("3d-ja.png"));
+    juce::TextButton* quadButton=nullptr;
+    for (auto* child : editor->getChildren())
+        if (auto* button=dynamic_cast<juce::TextButton*>(child); button && button->getButtonText()=="4") quadButton=button;
+    check(quadButton!=nullptr,"Four-view control exists"); quadButton->onClick();
+    check(p.quadView.load(),"Four-view control enables the layout");
+    interactive->mouseDown(makeMouse({220,170}));
+    const auto quadBefore=editor->createComponentSnapshot(editor->getLocalBounds());
+    interactive->mouseDrag(makeMouse({250,185}));
+    interactive->mouseDown(makeMouse({220,170},true)); interactive->mouseDrag(makeMouse({235,180},true));
+    const auto quadAfter=editor->createComponentSnapshot(editor->getLocalBounds());
+    check(std::abs(p.readCamera().x-imagine::Camera::home().x)>0.01f,"Top-left viewport rotates in four-view mode");
+    for (int y=45;y<620;++y) for (int x=460;x<875;++x)
+        check(quadBefore.getPixelAt(x,y)==quadAfter.getPixelAt(x,y),"Axis viewports stay fixed while the free viewport rotates");
+    const auto freeCamera=p.readCamera();
+    interactive->mouseDown(makeMouse({670,170})); interactive->mouseDrag(makeMouse({700,190}));
+    interactive->mouseWheelMove(makeMouse({670,170}),wheel);
+    interactive->mouseDrag(makeMouse({710,195},true));
+    check(p.readCamera().x==freeCamera.x && p.readCamera().zoom==freeCamera.zoom && p.readCamera().panX==freeCamera.panX,"Fixed viewport gestures do not change the free camera");
+    for (const auto size : {juce::Point<int>(900,700),juce::Point<int>(560,360)})
+    {
+        editor->setSize(size.x,size.y); save(*editor,directory.getChildFile("quad-"+juce::String(size.x)+".png"));
+    }
+    editor.reset(p.createEditor()); interactive=dynamic_cast<SoundImagineEditor*>(editor.get());
+    check(p.quadView.load(),"Editor reopening keeps the four-view layout");
+    p.quadView.store(false); p.saveCamera(imagine::Camera::home()); editor->setSize(900,700);
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
     for (auto* child : editor->getChildren())
         if (auto* button=dynamic_cast<juce::TextButton*>(child))
             check(button->getButtonText()!="3D" && button->getButtonText()!="Map","Redundant view switches are removed");

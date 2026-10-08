@@ -112,7 +112,7 @@ SoundImagineEditor::SoundImagineEditor(SoundImagineProcessor& p) : AudioProcesso
     setOpaque(true); setResizable(true,true); setResizeLimits(560,360,1440,1000);
     // Old Map state has the same semantics as a Z alignment.
     if (processor.view.exchange(0)==1) { camera=imagine::Camera::aligned(2); processor.saveCamera(camera); }
-    for (auto* button : {&axisX,&axisY,&axisZ,&home,&freeze,&settings,&tableButton,&help})
+    for (auto* button : {&axisX,&axisY,&axisZ,&quadButton,&home,&freeze,&settings,&tableButton,&help})
     {
         addAndMakeVisible(button);
         button->setColour(juce::TextButton::buttonColourId,grid);
@@ -124,6 +124,13 @@ SoundImagineEditor::SoundImagineEditor(SoundImagineProcessor& p) : AudioProcesso
     home.onClick=[this] {camera=imagine::Camera::home(); alignedAxis=-1; processor.saveCamera(camera); repaint();};
     freeze.onClick=[this] {frozen=!frozen; freeze.setToggleState(frozen,juce::dontSendNotification); repaint();};
     settings.onClick=[this] {showSettings();}; help.onClick=[this] {showHelp=!showHelp; repaint();};
+    quadButton.onClick=[this]
+    {
+        processor.quadView.store(!processor.quadView.load());
+        quadButton.setToggleState(processor.quadView.load(),juce::dontSendNotification);
+        if (processor.quadView.load() && camera.alignedAxis()>=0) home.onClick();
+        dragging=false; resized(); repaint();
+    };
     tableButton.onClick=[this] {showTable();};
     data=processor.readSnapshot(); timerCallback(); setSize(760,540); startTimerHz(30);
 }
@@ -141,6 +148,8 @@ void SoundImagineEditor::updateLanguage()
     axisX.setTooltip(tr("Side vs level (frequency hidden)","Mid / Sideと強さ（周波数は重なる）"));
     axisY.setTooltip(tr("Frequency vs level (Side hidden)","周波数と強さ（Sideは重なる）"));
     axisZ.setTooltip(tr("Frequency vs Side (level hidden)","周波数とMid / Side（強さは重なる）"));
+    quadButton.setTooltip(tr("Four views: free / X / Y / Z", "4分割：自由視点 / X / Y / Z"));
+    setTooltip(tr("Drag to rotate; Shift-drag to pan; wheel to zoom", "ドラッグで回転、Shift＋ドラッグで平行移動、ホイールで拡大縮小"));
     home.setTooltip(tr("Reset camera","視点をリセット")); freeze.setTooltip(tr("Freeze measurements","測定値の表示を保持"));
     settings.setTooltip(tr("FFT / averaging / level / language","FFT・平均化・レベル表示・言語")); help.setTooltip(tr("Reading the graph","グラフの読み方"));
     tableButton.setTooltip(tr("Show all bands in a separate window","全帯域の測定値を別ウィンドウで表示"));
@@ -179,16 +188,18 @@ void SoundImagineEditor::showSettings()
 }
 void SoundImagineEditor::resized()
 {
-    const int x=getWidth()-300;
+    const int x=getWidth()-336;
     int i=0;
-    for (auto* button : {&axisX,&axisY,&axisZ,&home,&freeze,&settings,&tableButton,&help}) button->setBounds(x+i++*36,8,32,25);
-    plot={56.f,48.f,static_cast<float>(getWidth()-112),static_cast<float>(getHeight()-150)};
+    for (auto* button : {&axisX,&axisY,&axisZ,&quadButton,&home,&freeze,&settings,&tableButton,&help}) button->setBounds(x+i++*36,8,32,25);
+    plot=plotFor(0);
 }
 void SoundImagineEditor::timerCallback()
 {
     if (!frozen) {data=processor.readSnapshot(); stale=data.frames==0 || juce::Time::getMillisecondCounterHiRes()-data.capturedMs>500;}
     if (lastLanguage!=processor.language.load()) updateLanguage();
     camera=processor.readCamera(); alignedAxis=camera.alignedAxis();
+    plot=plotFor(0);
+    quadButton.setToggleState(processor.quadView.load(),juce::dontSendNotification);
     axisX.setToggleState(alignedAxis==0,juce::dontSendNotification); axisY.setToggleState(alignedAxis==1,juce::dontSendNotification); axisZ.setToggleState(alignedAxis==2,juce::dontSendNotification);
     if (tableWindow && tableWindow->isVisible())
     {
@@ -199,6 +210,7 @@ void SoundImagineEditor::timerCallback()
 }
 void SoundImagineEditor::align(int axis)
 {
+    processor.quadView.store(false); quadButton.setToggleState(false,juce::dontSendNotification); dragging=false; resized();
     camera=imagine::Camera::aligned(axis); alignedAxis=axis; processor.saveCamera(camera); repaint();
 }
 float SoundImagineEditor::level(const imagine::Band& b) const
@@ -211,20 +223,45 @@ imagine::Vec3 SoundImagineEditor::world(float f,float side,float db) const
     const float floor=static_cast<float>(processor.floorDb.load());
     return {(u-0.5f)*2,(side-0.5f)*1.4f,(std::clamp((db-floor)/-floor,0.f,1.f)-0.5f)*1.4f};
 }
-juce::Point<float> SoundImagineEditor::screen(imagine::Vec3 v) const
+juce::Rectangle<float> SoundImagineEditor::viewport(int index) const
 {
-    const auto a=camera.transform({2,0,0}),b=camera.transform({0,1.4f,0}),c=camera.transform({0,0,1.4f});
-    const float extentX=std::abs(a.x)+std::abs(b.x)+std::abs(c.x),extentY=std::abs(a.y)+std::abs(b.y)+std::abs(c.y);
-    const auto q=camera.transform(v);
-    // Normalize each projected span to the viewport: the axes have different units,
-    // so screen aspect is a display choice, not a physical distance metric.
-    return {plot.getCentreX()+q.x*plot.getWidth()*camera.zoom/std::max(0.01f,extentX),
-            plot.getCentreY()-q.y*plot.getHeight()*camera.zoom/std::max(0.01f,extentY)};
+    juce::Rectangle<float> area {12.f,40.f,static_cast<float>(getWidth()-24),static_cast<float>(getHeight()-115)};
+    if (!processor.quadView.load()) return area;
+    const float width=(area.getWidth()-8)*0.5f,height=(area.getHeight()-8)*0.5f;
+    return {area.getX()+(index%2)*(width+8),area.getY()+(index/2)*(height+8),width,height};
 }
-juce::Point<float> SoundImagineEditor::project(float f,float side,float db) const {return screen(world(f,side,db));}
-void SoundImagineEditor::drawPlot(juce::Graphics& g)
+juce::Rectangle<float> SoundImagineEditor::plotFor(int index) const
 {
-    const juce::Graphics::ScopedSaveState save(g); g.reduceClipRegion(0,0,getWidth(),getHeight()-75);
+    const auto area=viewport(index);
+    if (processor.quadView.load()) return {area.getX()+36,area.getY()+30,area.getWidth()-54,area.getHeight()-52};
+    return {area.getX()+44,area.getY()+28,area.getWidth()-76,area.getHeight()-62};
+}
+imagine::Camera SoundImagineEditor::cameraFor(int index) const
+{
+    return index==0 ? camera : imagine::Camera::aligned(index-1);
+}
+int SoundImagineEditor::viewportAt(juce::Point<float> p) const
+{
+    for (int i=0;i<(processor.quadView.load() ? 4 : 1);++i) if (viewport(i).contains(p)) return i;
+    return -1;
+}
+juce::Point<float> SoundImagineEditor::screen(imagine::Vec3 v,const imagine::Camera& viewCamera,juce::Rectangle<float> area) const
+{
+    const auto q=viewCamera.transform(v);
+    const float scale=viewCamera.projectionScale(area.getWidth(),area.getHeight());
+    return {area.getCentreX()+q.x*scale+viewCamera.panX*area.getWidth(),
+            area.getCentreY()-q.y*scale+viewCamera.panY*area.getHeight()};
+}
+juce::Point<float> SoundImagineEditor::project(float f,float side,float db,const imagine::Camera& viewCamera,juce::Rectangle<float> area) const
+{
+    return screen(world(f,side,db),viewCamera,area);
+}
+void SoundImagineEditor::drawPlot(juce::Graphics& g,const imagine::Camera& viewCamera,juce::Rectangle<float> area,juce::Rectangle<float> clip)
+{
+    const juce::Graphics::ScopedSaveState save(g); g.reduceClipRegion(clip.toNearestInt());
+    const int viewAxis=viewCamera.alignedAxis();
+    const bool compact=area.getHeight()<120;
+    const auto project=[this,&viewCamera,area](float f,float side,float db) {return this->project(f,side,db,viewCamera,area);};
     const float floor=static_cast<float>(processor.floorDb.load()),upper=data.bands[static_cast<size_t>(data.numBands-1)].high;
     auto line=[&g](juce::Point<float> a,juce::Point<float> b,juce::Colour c,float width=1.f) {g.setColour(c); g.drawLine({a,b},width);};
     const auto origin=project(20,0,floor);
@@ -234,32 +271,35 @@ void SoundImagineEditor::drawPlot(juce::Graphics& g)
     {
         if (f>upper) continue;
         const auto a=project(f,0,floor),b=project(f,1,floor);
-        line(a,b,grid); if (alignedAxis!=2) line(b,project(f,1,0),grid.withAlpha(0.5f));
-        if (alignedAxis!=0 && a.getDistanceFrom(previous)>32) {text(g,hz(f),{a.x-22,a.y+8,44,18},11,muted,juce::Justification::centred); previous=a;}
+        line(a,b,grid); if (viewAxis!=2) line(b,project(f,1,0),grid.withAlpha(0.5f));
+        if (viewAxis!=0 && !(compact && viewAxis<0) && (!compact || f==20 || f==1000 || f==20000) && a.getDistanceFrom(previous)>32) {text(g,hz(f),{a.x-22,a.y+8,44,18},11,muted,juce::Justification::centred); previous=a;}
     }
-    if (upper<20000) {const auto a=project(upper,0,floor); text(g,hz(upper),{a.x-22,a.y+8,44,18},11,muted,juce::Justification::centred);}
+    if (upper<20000 && viewAxis!=0) {const auto a=project(upper,0,floor); text(g,hz(upper),{a.x-22,a.y+8,44,18},11,muted,juce::Justification::centred);}
     for (float side : {0.f,0.25f,0.5f,0.75f,1.f})
     {
         const auto a=project(20,side,floor),b=project(upper,side,floor); line(a,b,grid);
-        if (alignedAxis!=1)
+        if (viewAxis!=2) line(a,project(20,side,0),grid);
+        if (viewAxis!=1 && !(compact && viewAxis<0) && (!compact || side==0 || side==0.5f || side==1))
         {
             const juce::String label=side==0 ? "Mid" : side==1 ? "Side" : juce::String(juce::roundToInt(side*100))+"%";
             if (label.isNotEmpty())
             {
                 // X alignment makes Mid left and Side right; Z makes Mid bottom and Side top.
-                if (alignedAxis==0) text(g,label,{a.x-44,a.y+9,88,18},11,ink,juce::Justification::centred);
+                if (viewAxis==0) text(g,label,{a.x-44,a.y+9,88,18},11,ink,juce::Justification::centred);
+                else if (viewAxis<0) text(g,label,{b.x+5,b.y-9,48,18},10,ink);
                 else text(g,label,{a.x-52,a.y-9,48,18},10,ink,juce::Justification::centredRight);
             }
         }
     }
-    if (alignedAxis!=2)
+    if (viewAxis!=2)
     {
-        const int step=plot.getHeight()>=260 ? 6 : 12;
+        const int step=compact ? static_cast<int>(-floor)/2 : area.getHeight()>=260 ? 6 : 12;
         for (int db=static_cast<int>(floor);db<=0;db+=step)
         {
             const auto a=project(20,0,static_cast<float>(db)),b=project(upper,0,static_cast<float>(db));
-            line(a,b,grid.withAlpha(db%12==0 ? 0.8f : 0.4f));
-            if (db%12==0 || plot.getHeight()>300) text(g,juce::String(db),{a.x-38,a.y-9,30,18},11,muted,juce::Justification::centredRight);
+            const auto colour=grid.withAlpha(db%12==0 ? 0.8f : 0.4f);
+            line(a,b,colour); line(a,project(20,1,static_cast<float>(db)),colour);
+            if (!(compact && viewAxis<0) && (compact || db%12==0 || area.getHeight()>300)) text(g,juce::String(db),{a.x-38,a.y-9,30,18},11,muted,juce::Justification::centredRight);
         }
     }
     const std::array<juce::Point<float>,3> ends {project(upper,0,floor),project(20,1,floor),project(20,0,0)};
@@ -269,7 +309,13 @@ void SoundImagineEditor::drawPlot(juce::Graphics& g)
         g.setColour(i==0 ? mint : i==1 ? amber : coral); g.drawArrow({origin,endpoint},1.2f,7,5);
     }
     const auto zEnd=ends[2];
-    if (alignedAxis!=2) text(g,processor.levelMode.load()==0 ? "dBFS / RMS" : "dBFS/Hz / PSD",{zEnd.x-28,zEnd.y-26,125,18},11,ink);
+    if (viewAxis!=2)
+    {
+        const juce::Rectangle<float> labelArea=processor.quadView.load()
+            ? juce::Rectangle<float>(clip.getRight()-135,clip.getY()+4,125,18)
+            : juce::Rectangle<float>(zEnd.x-28,zEnd.y-26,125,18);
+        text(g,processor.levelMode.load()==0 ? "dBFS / RMS" : "dBFS/Hz / PSD",labelArea,11,ink);
+    }
     // Far points first; no connecting trajectory between independent band measurements.
     struct Dot {int index; juce::Point<float> p; float depth;}; std::vector<Dot> dots;
     for (int i=0;i<data.numBands;++i)
@@ -277,28 +323,41 @@ void SoundImagineEditor::drawPlot(juce::Graphics& g)
         const auto& b=data.bands[static_cast<size_t>(i)]; const float db=level(b);
         if (!b.active || db<floor) continue;
         const float f=std::sqrt(b.low*b.high); const auto p=project(f,b.side,db);
-        if (alignedAxis!=2) line(project(f,b.side,floor),p,bandColour(b).withAlpha(0.15f));
-        dots.push_back({i,p,camera.transform(world(f,b.side,db)).z});
+        if (viewAxis!=2) line(project(f,b.side,floor),p,bandColour(b).withAlpha(0.15f));
+        dots.push_back({i,p,viewCamera.transform(world(f,b.side,db)).z});
     }
     std::sort(dots.begin(),dots.end(),[](const Dot& a,const Dot& b) {return a.depth<b.depth;});
     for (const auto& dot : dots)
     {
         const auto& b=data.bands[static_cast<size_t>(dot.index)];
-        const float radius=alignedAxis==2 ? 3+5*std::clamp((level(b)-floor)/-floor,0.f,1.f) : 3.5f;
+        const float radius=viewAxis==2 ? 3+5*std::clamp((level(b)-floor)/-floor,0.f,1.f) : 3.5f;
         g.setColour(bandColour(b)); g.fillEllipse(dot.p.x-radius,dot.p.y-radius,2*radius,2*radius);
         if (dot.index==selected) {g.setColour(ink); g.drawEllipse(dot.p.x-radius-4,dot.p.y-radius-4,2*radius+8,2*radius+8,1.2f);}
     }
-    const juce::Point<float> centre {static_cast<float>(getWidth()-26),static_cast<float>(getHeight()-107)};
+    const juce::Point<float> centre {clip.getRight()-22,clip.getBottom()-22};
     const std::array<imagine::Vec3,3> axes {{{1,0,0},{0,1,0},{0,0,1}}}; const std::array<juce::String,3> names {"X","Y","Z"};
     for (int i=0;i<3;++i)
     {
-        const auto v=camera.transform(axes[static_cast<size_t>(i)]); const auto p=centre+juce::Point<float>(v.x*18,-v.y*18);
+        const auto v=viewCamera.transform(axes[static_cast<size_t>(i)]); const auto p=centre+juce::Point<float>(v.x*18,-v.y*18);
         line(centre,p,i==0 ? mint : i==1 ? amber : coral,1.5f); text(g,names[static_cast<size_t>(i)],{p.x-6,p.y-8,12,16},10,ink,juce::Justification::centred);
     }
 }
 void SoundImagineEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(background); drawPlot(g);
+    g.fillAll(background);
+    text(g,"SoundImagine",{14,9,180,24},13,muted);
+    const bool quad=processor.quadView.load();
+    const std::array<juce::String,4> titles {tr("Free view","自由視点"),tr("X view","X方向"),tr("Y view","Y方向"),tr("Z view","Z方向")};
+    for (int i=0;i<(quad ? 4 : 1);++i)
+    {
+        const auto area=viewport(i);
+        if (quad)
+        {
+            g.setColour(grid); g.drawRoundedRectangle(area,4,1);
+            text(g,titles[static_cast<size_t>(i)],{area.getX()+10,area.getY()+4,150,20},11,ink);
+        }
+        drawPlot(g,cameraFor(i),plotFor(i),area);
+    }
     const float y=static_cast<float>(getHeight()-67),col=static_cast<float>(getWidth()-24)/5;
     g.setColour(grid); g.drawHorizontalLine(static_cast<int>(y-8),12,static_cast<float>(getWidth()-12));
     const auto& b=data.bands[static_cast<size_t>(std::min(selected,data.numBands-1))]; const bool valid=b.active && data.frames>0;
@@ -339,12 +398,13 @@ void SoundImagineEditor::paint(juce::Graphics& g)
 }
 void SoundImagineEditor::selectAt(juce::Point<float> p)
 {
-    if (!plot.expanded(25).contains(p)) return;
+    const int index=viewportAt(p); if (index<0) return;
+    const auto viewCamera=cameraFor(index); const auto area=plotFor(index);
     float nearest=24.f,bestDepth=-1.e9f;
     for (int i=0;i<data.numBands;++i)
     {
         const auto& b=data.bands[static_cast<size_t>(i)]; const float db=level(b); if (!b.active || db<processor.floorDb.load()) continue;
-        const float f=std::sqrt(b.low*b.high),distance=p.getDistanceFrom(project(f,b.side,db)),depth=camera.transform(world(f,b.side,db)).z;
+        const float f=std::sqrt(b.low*b.high),distance=p.getDistanceFrom(project(f,b.side,db,viewCamera,area)),depth=viewCamera.transform(world(f,b.side,db)).z;
         if (distance<nearest-0.5f || (std::abs(distance-nearest)<=0.5f && depth>bestDepth)) {nearest=distance; bestDepth=depth; selected=i;}
     }
     repaint();
@@ -357,6 +417,13 @@ void SoundImagineEditor::mouseDown(const juce::MouseEvent& e)
 void SoundImagineEditor::mouseDrag(const juce::MouseEvent& e)
 {
     if (!dragging) return; const float radius=std::min(plot.getWidth(),plot.getHeight())*0.5f;
+    if (e.mods.isShiftDown())
+    {
+        camera=dragCamera;
+        camera.panX+=(e.position.x-dragStart.x)/plot.getWidth();
+        camera.panY+=(e.position.y-dragStart.y)/plot.getHeight();
+        processor.saveCamera(camera); repaint(); return;
+    }
     const auto from=(dragStart-plot.getCentre())/radius,to=(e.position-plot.getCentre())/radius;
     camera=dragCamera; camera.orbit(from.x,-from.y,to.x,-to.y); alignedAxis=-1; processor.saveCamera(camera); repaint();
 }

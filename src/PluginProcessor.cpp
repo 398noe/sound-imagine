@@ -72,8 +72,10 @@ void SoundImagineProcessor::getStateInformation(juce::MemoryBlock& data)
     xml.setAttribute("view", view.load()); xml.setAttribute("floor", floorDb.load()); xml.setAttribute("language",language.load());
     xml.setAttribute("fftOrder",fftOrderSetting.load()); xml.setAttribute("smoothing",smoothingMs.load()); xml.setAttribute("levelMode",levelMode.load());
     xml.setAttribute("bands",displayBands.load());
+    xml.setAttribute("quadView",quadView.load());
     const auto c=readCamera();
     xml.setAttribute("qw",c.w); xml.setAttribute("qx",c.x); xml.setAttribute("qy",c.y); xml.setAttribute("qz",c.z); xml.setAttribute("zoom",c.zoom);
+    xml.setAttribute("panX",c.panX); xml.setAttribute("panY",c.panY);
     copyXmlToBinary(xml, data);
 }
 void SoundImagineProcessor::setStateInformation(const void* data, int size)
@@ -89,10 +91,12 @@ void SoundImagineProcessor::setStateInformation(const void* data, int size)
         smoothingMs.store(juce::jlimit(50,1000,xml->getIntAttribute("smoothing",250)));
         levelMode.store(juce::jlimit(0,1,xml->getIntAttribute("levelMode",0)));
         const int bands=xml->getIntAttribute("bands",32); displayBands.store(bands==64 || bands==128 ? bands : 32);
+        quadView.store(xml->getBoolAttribute("quadView",false));
         auto c=imagine::Camera::home();
         c.w=static_cast<float>(xml->getDoubleAttribute("qw",c.w)); c.x=static_cast<float>(xml->getDoubleAttribute("qx",c.x));
         c.y=static_cast<float>(xml->getDoubleAttribute("qy",c.y)); c.z=static_cast<float>(xml->getDoubleAttribute("qz",c.z));
         c.zoom=static_cast<float>(xml->getDoubleAttribute("zoom",1));
+        c.panX=static_cast<float>(xml->getDoubleAttribute("panX",0)); c.panY=static_cast<float>(xml->getDoubleAttribute("panY",0));
         if (view.load()==1) { c=imagine::Camera::aligned(2); view.store(0); }
         saveCamera(c);
     }

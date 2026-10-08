@@ -10,6 +10,7 @@ struct Camera
 {
     // Unit quaternion maps world X=frequency, Y=Side, Z=RMS to camera space.
     float w = 1, x = 0, y = 0, z = 0, zoom = 1;
+    float panX = 0, panY = 0;
     static Camera multiply(const Camera& a, const Camera& b)
     {
         Camera c;
@@ -17,7 +18,7 @@ struct Camera
         c.x = a.w*b.x+a.x*b.w+a.y*b.z-a.z*b.y;
         c.y = a.w*b.y-a.x*b.z+a.y*b.w+a.z*b.x;
         c.z = a.w*b.z+a.x*b.y-a.y*b.x+a.z*b.w;
-        c.zoom = b.zoom; c.normalise(); return c;
+        c.zoom = b.zoom; c.panX=b.panX; c.panY=b.panY; c.normalise(); return c;
     }
     void normalise()
     {
@@ -25,6 +26,8 @@ struct Camera
         if (!std::isfinite(n) || n < 0.00001f) { w=1; x=y=z=0; }
         else { w/=n; x/=n; y/=n; z/=n; }
         zoom = std::isfinite(zoom) ? std::clamp(zoom,0.5f,2.5f) : 1;
+        panX = std::isfinite(panX) ? std::clamp(panX,-2.f,2.f) : 0;
+        panY = std::isfinite(panY) ? std::clamp(panY,-2.f,2.f) : 0;
     }
     Vec3 transform(Vec3 v) const
     {
@@ -54,8 +57,18 @@ struct Camera
     static Vec3 sphere(float px, float py)
     {
         const float r = px*px+py*py;
-        if (r <= 1) return { px,py,std::sqrt(1-r) };
-        const float n = std::sqrt(r); return { px/n,py/n,0 };
+        // A hyperbolic continuation avoids the abrupt rim of a virtual sphere.
+        const float pz = r <= 0.5f ? std::sqrt(1-r) : 0.5f/std::sqrt(r);
+        const float n = std::sqrt(r+pz*pz); return { px/n,py/n,pz/n };
+    }
+    float projectionScale(float width, float height) const
+    {
+        // Keep a rigid, constant scale during orbit. The bounding sphere fits
+        // every rotation; fixed axis views can use their visible plane's span.
+        if (alignedAxis() < 0) return std::min(width,height)*zoom/std::sqrt(7.92f);
+        const auto a=transform({2,0,0}),b=transform({0,1.4f,0}),c=transform({0,0,1.4f});
+        return std::min(width/(std::abs(a.x)+std::abs(b.x)+std::abs(c.x)),
+                        height/(std::abs(a.y)+std::abs(b.y)+std::abs(c.y)))*zoom;
     }
     void orbit(float fromX, float fromY, float toX, float toY)
     {

@@ -33,6 +33,7 @@ public:
     std::atomic<int> view { 0 }, floorDb { -72 }, language { 1 };
     std::atomic<int> fftOrderSetting { imagine::fftOrder }, smoothingMs { 250 }, levelMode { 0 };
     std::atomic<int> displayBands { 32 };
+    std::atomic<bool> quadView { false };
     std::atomic<std::uint64_t> dropped { 0 };
 private:
     void run() override;

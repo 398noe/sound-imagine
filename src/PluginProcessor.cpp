@@ -58,11 +58,16 @@ void SoundImagineProcessor::run()
     }
 }
 imagine::Snapshot SoundImagineProcessor::readSnapshot() { std::lock_guard lock(snapshotMutex); return published; }
+imagine::Camera SoundImagineProcessor::readCamera() { std::lock_guard lock(cameraMutex); return camera; }
+void SoundImagineProcessor::saveCamera(imagine::Camera c) { c.normalise(); std::lock_guard lock(cameraMutex); camera=c; }
 juce::AudioProcessorEditor* SoundImagineProcessor::createEditor() { return new SoundImagineEditor(*this); }
 void SoundImagineProcessor::getStateInformation(juce::MemoryBlock& data)
 {
     juce::XmlElement xml("SoundImagine"); xml.setAttribute("version", 2);
-    xml.setAttribute("view", view.load()); xml.setAttribute("floor", floorDb.load()); copyXmlToBinary(xml, data);
+    xml.setAttribute("view", view.load()); xml.setAttribute("floor", floorDb.load()); xml.setAttribute("language",language.load());
+    const auto c=readCamera();
+    xml.setAttribute("qw",c.w); xml.setAttribute("qx",c.x); xml.setAttribute("qy",c.y); xml.setAttribute("qz",c.z); xml.setAttribute("zoom",c.zoom);
+    copyXmlToBinary(xml, data);
 }
 void SoundImagineProcessor::setStateInformation(const void* data, int size)
 {
@@ -72,6 +77,11 @@ void SoundImagineProcessor::setStateInformation(const void* data, int size)
         view.store(juce::jlimit(0, 1, xml->getIntAttribute("view", 0)));
         const int floor = xml->getIntAttribute("floor", -72);
         floorDb.store(floor == -48 || floor == -90 ? floor : -72);
+        language.store(juce::jlimit(0,1,xml->getIntAttribute("language",1)));
+        auto c=imagine::Camera::home();
+        c.w=static_cast<float>(xml->getDoubleAttribute("qw",c.w)); c.x=static_cast<float>(xml->getDoubleAttribute("qx",c.x));
+        c.y=static_cast<float>(xml->getDoubleAttribute("qy",c.y)); c.z=static_cast<float>(xml->getDoubleAttribute("qz",c.z));
+        c.zoom=static_cast<float>(xml->getDoubleAttribute("zoom",1)); saveCamera(c);
     }
 }
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new SoundImagineProcessor(); }

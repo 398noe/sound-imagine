@@ -35,6 +35,24 @@ imagine::Snapshot tone(double sr, float gainR, double phase = 0, double frequenc
 }
 void coreTests()
 {
+    for (int axis=0;axis<3;++axis)
+    {
+        const auto c=imagine::Camera::aligned(axis);
+        const std::array<imagine::Vec3,3> directions {{{1,0,0},{0,1,0},{0,0,1}}};
+        const auto v=c.transform(directions[static_cast<size_t>(axis)]);
+        check(std::abs(v.x)<1.e-6f && std::abs(v.y)<1.e-6f && std::abs(v.z)>0.9999f,
+            "Axis alignment removes exactly the selected data dimension from the screen");
+        check(c.alignedAxis()==axis,"Restored camera identifies its alignment");
+    }
+    auto orbit=imagine::Camera::home();
+    const auto original=orbit.transform({0.3f,0.7f,-0.4f});
+    orbit.orbit(0,0,0.4f,0.2f);
+    const auto rotated=orbit.transform({0.3f,0.7f,-0.4f});
+    check(std::abs(rotated.x-original.x)>0.01f,"Trackball changes the view");
+    check(std::abs(rotated.x*rotated.x+rotated.y*rotated.y+rotated.z*rotated.z-0.74f)<1.e-5f,"Rotation preserves spatial lengths");
+    for (int i=0;i<1000;++i) orbit.orbit(0.2f,-0.2f,0.21f,-0.19f);
+    check(std::abs(orbit.w*orbit.w+orbit.x*orbit.x+orbit.y*orbit.y+orbit.z*orbit.z-1)<1.e-5f,"Repeated orbit stays normalized");
+    orbit.orbit(-2,0,2,0); check(std::isfinite(orbit.w),"Antipodal trackball drag is finite");
     for (const double sr : { 32000., 44100., 48000., 96000., 192000. })
     {
         const auto mono = tone(sr, 1); const auto& m = strongest(mono);
@@ -87,14 +105,19 @@ void pluginTests(const juce::File& directory)
     juce::AudioProcessor::BusesLayout mono; mono.inputBuses.add(juce::AudioChannelSet::mono()); mono.outputBuses.add(juce::AudioChannelSet::mono());
     check(p.isBusesLayoutSupported(mono), "Mono buses supported"); mono.outputBuses.set(0, juce::AudioChannelSet::stereo());
     check(!p.isBusesLayoutSupported(mono), "Mismatched buses rejected");
-    p.view.store(1); p.floorDb.store(-48); juce::MemoryBlock state; p.getStateInformation(state);
+    check(p.language.load()==1,"Japanese is the initial language");
+    p.view.store(1); p.floorDb.store(-48); p.language.store(0);
+    auto savedCamera=imagine::Camera::aligned(0); savedCamera.zoom=1.4f; p.saveCamera(savedCamera);
+    juce::MemoryBlock state; p.getStateInformation(state);
     auto restoredStorage = std::make_unique<SoundImagineProcessor>(); auto& restored = *restoredStorage;
     restored.setStateInformation(state.getData(), static_cast<int>(state.getSize()));
     check(restored.view.load() == 1 && restored.floorDb.load() == -48, "Settings survive session save/load");
+    check(restored.language.load()==0 && restored.readCamera().alignedAxis()==0 && std::abs(restored.readCamera().zoom-1.4f)<0.001f,
+        "Language, orientation and zoom survive session save/load");
     const char invalid[] = "invalid"; restored.setStateInformation(invalid, sizeof(invalid));
     check(restored.view.load() == 1 && restored.floorDb.load() == -48, "Malformed state is ignored");
     p.prepareToPlay(96000, 257); check(p.readSnapshot().frames == 0 && p.readSnapshot().sampleRate == 96000, "Reprepare clears FIFO and sample rate");
-    p.prepareToPlay(48000, 257); p.view.store(0); p.floorDb.store(-72);
+    p.prepareToPlay(48000, 257); p.view.store(0); p.floorDb.store(-72); p.saveCamera(imagine::Camera::home());
     for (int block = 0; block < 130; ++block)
     {
         for (int i = 0; i < 257; ++i)
@@ -116,6 +139,50 @@ void pluginTests(const juce::File& directory)
         editor->setSize(size.x, size.y); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
         save(*editor, directory.getChildFile("3d-" + juce::String(size.x) + ".png"));
     }
+    editor->setSize(900,700);
+    auto* interactive=dynamic_cast<SoundImagineEditor*>(editor.get());
+    check(interactive!=nullptr,"Interactive editor is available");
+    const auto makeMouse=[&](juce::Point<float> position)
+    {
+        return juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(),position,
+            juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier),1,0,0,0,0,editor.get(),editor.get(),
+            juce::Time::getCurrentTime(),{450,340},juce::Time::getCurrentTime(),1,true);
+    };
+    interactive->mouseDown(makeMouse({450,340})); interactive->mouseDrag(makeMouse({510,370}));
+    check(std::abs(p.readCamera().x-imagine::Camera::home().x)>0.01f,"Dragging the plot rotates the actual editor camera");
+    juce::MouseWheelDetails wheel {}; wheel.deltaY=0.3f;
+    interactive->mouseWheelMove(makeMouse({450,340}),wheel);
+    check(p.readCamera().zoom>1.2f,"Wheel zoom updates the actual editor camera");
+    save(*editor,directory.getChildFile("rotated.png"));
+    interactive->mouseDoubleClick(makeMouse({450,340}));
+    check(std::abs(p.readCamera().zoom-1)<0.001f && std::abs(p.readCamera().x-imagine::Camera::home().x)<0.001f,
+        "Double-click resets orientation and zoom");
+    for (auto* child : editor->getChildren())
+        if (auto* button=dynamic_cast<juce::TextButton*>(child); button && button->getButtonText()=="X")
+        { button->onClick(); check(p.readCamera().alignedAxis()==0,"X alignment control changes the persisted camera"); }
+    for (int axis=0;axis<3;++axis)
+    {
+        p.saveCamera(imagine::Camera::aligned(axis)); p.language.store(1);
+        juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
+        save(*editor,directory.getChildFile("axis-"+juce::String(axis)+"-ja.png"));
+    }
+    p.saveCamera(imagine::Camera::home());
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
+    save(*editor,directory.getChildFile("3d-ja.png"));
+    for (auto* child : editor->getChildren())
+        if (auto* combo=dynamic_cast<juce::ComboBox*>(child); combo && combo->getNumItems()==2)
+        {
+            combo->setSelectedId(1,juce::sendNotificationSync);
+            check(p.language.load()==0,"Language selector switches to English");
+            combo->setSelectedId(2,juce::sendNotificationSync);
+            check(p.language.load()==1,"Language selector switches to Japanese");
+        }
+    for (auto* child : editor->getChildren())
+        if (auto* button=dynamic_cast<juce::TextButton*>(child); button && button->getButtonText()=="?") button->onClick();
+    editor->setSize(720,520); save(*editor,directory.getChildFile("help-ja.png"));
+    for (auto* child : editor->getChildren())
+        if (auto* button=dynamic_cast<juce::TextButton*>(child); button && button->getButtonText()=="?") button->onClick();
+    p.language.store(0); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
     editor->setSize(900,640); p.view.store(1); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
     save(*editor, directory.getChildFile("map.png"));
     juce::TextButton* freezeButton = nullptr;

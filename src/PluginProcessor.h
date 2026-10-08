@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Analyzer.h"
+#include "Camera.h"
 #include <mutex>
 
 class SoundImagineProcessor final : public juce::AudioProcessor, private juce::Thread
@@ -27,7 +28,9 @@ public:
     void getStateInformation(juce::MemoryBlock&) override;
     void setStateInformation(const void*, int) override;
     imagine::Snapshot readSnapshot();
-    std::atomic<int> view { 0 }, floorDb { -72 };
+    imagine::Camera readCamera();
+    void saveCamera(imagine::Camera);
+    std::atomic<int> view { 0 }, floorDb { -72 }, language { 1 };
     std::atomic<std::uint64_t> dropped { 0 };
 private:
     void run() override;
@@ -37,5 +40,7 @@ private:
     imagine::Analyzer analyzer;
     std::mutex snapshotMutex;
     imagine::Snapshot published;
+    std::mutex cameraMutex;
+    imagine::Camera camera = imagine::Camera::home();
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SoundImagineProcessor)
 };

@@ -1,0 +1,190 @@
+#include "PluginProcessor.h"
+#include "PluginEditor.h"
+#include <juce_audio_utils/juce_audio_utils.h>
+#include <cmath>
+#include <cstdlib>
+#include <iostream>
+#include <limits>
+#include <random>
+
+namespace
+{
+void check(bool ok, const char* message)
+{
+    if (!ok) { std::cerr << "FAIL: " << message << '\n'; std::exit(1); }
+}
+const imagine::Band& strongest(const imagine::Snapshot& s)
+{
+    return *std::max_element(s.bands.begin(), s.bands.end(), [](const auto& a, const auto& b) { return a.levelDb < b.levelDb; });
+}
+double totalPower(const imagine::Snapshot& s)
+{
+    double p = 0;
+    for (const auto& b : s.bands) if (b.active) p += std::pow(10.0, b.levelDb / 10.0);
+    return p;
+}
+imagine::Snapshot tone(double sr, float gainR, double phase = 0, double frequency = 1000)
+{
+    imagine::Analyzer a; a.reset(sr);
+    for (int i = 0; i < static_cast<int>(sr); ++i)
+    {
+        const double t = juce::MathConstants<double>::twoPi * frequency * i / sr;
+        a.push(static_cast<float>(0.5 * std::sin(t)), static_cast<float>(gainR * 0.5 * std::sin(t + phase)));
+    }
+    return a.snapshot();
+}
+void coreTests()
+{
+    for (const double sr : { 32000., 44100., 48000., 96000., 192000. })
+    {
+        const auto mono = tone(sr, 1); const auto& m = strongest(mono);
+        check(m.active && m.low < 1000 && m.high > 1000, "Tone is in the correct logarithmic band");
+        check(std::abs(m.side) < 0.0001f && std::abs(m.correlation - 1) < 0.0001f, "Identical L/R gives zero Side and +1 correlation");
+        check(std::abs(10 * std::log10(totalPower(mono)) + 9.0309) < 0.02, "Hann-normalized half-amplitude sine RMS is -9.03 dBFS");
+        check(mono.bands.back().high <= sr / 2 + 0.01, "Band limits follow Nyquist");
+        const auto inverse = tone(sr, -1); const auto& inv = strongest(inverse);
+        check(inv.side > 0.9999f && inv.correlation < -0.9999f, "Inverse stereo gives 100% Side and -1 correlation");
+        const auto oneSide = tone(sr, 0); const auto& o = strongest(oneSide);
+        check(std::abs(o.side - 0.5f) < 0.0001f && o.balance < -0.9999f && !o.correlationValid, "One-sided signal is distinguished from unrelated stereo");
+        const auto quarter = tone(sr, 1, juce::MathConstants<double>::halfPi); const auto& q = strongest(quarter);
+        check(std::abs(q.side - 0.5f) < 0.001f && std::abs(q.correlation) < 0.001f, "Quadrature tone gives zero real correlation");
+    }
+    const auto unequal = tone(48000, 0.5f); const auto& u = strongest(unequal);
+    check(std::abs(u.side - 0.1f) < 0.001f && std::abs(u.balance + 0.6f) < 0.001f && u.correlation > 0.999f, "Unequal aligned channels keep correlation +1 with nonzero Side");
+    imagine::Analyzer noise; std::mt19937 rng(398); std::uniform_real_distribution<float> dist(-0.25f, 0.25f);
+    for (int i = 0; i < 144000; ++i) noise.push(dist(rng), dist(rng));
+    double side = 0, corr = 0;
+    for (const auto& b : noise.snapshot().bands) { side += b.side; corr += b.correlation; }
+    check(std::abs(side / imagine::bandCount - 0.5) < 0.03 && std::abs(corr / imagine::bandCount) < 0.06, "Independent noise approaches 50% Side and zero correlation");
+    noise.reset(48000);
+    for (int i = 0; i < imagine::fftSize; ++i) noise.push(0, 0);
+    check(noise.snapshot().frames == 1, "First frame waits for a complete FFT window");
+    for (const auto& b : noise.snapshot().bands) check(!b.active && !b.correlationValid && std::isfinite(b.levelDb), "Silence has no invented correlation or invalid level");
+    for (int i = 0; i < 16384; ++i) noise.push(std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity());
+    check(!strongest(noise.snapshot()).active, "Nonfinite input cannot poison analysis");
+    noise.reset(44100); check(noise.snapshot().frames == 0 && !strongest(noise.snapshot()).active, "Reset clears previous measurements");
+    auto& decay = noise;
+    for (int i = 0; i < 44100; ++i) decay.push(std::sin(static_cast<float>(i) * 0.2f), 0);
+    for (int i = 0; i < 44100 * 6; ++i) decay.push(0, 0);
+    check(!strongest(decay.snapshot()).active, "Silent input releases averaged power to the measurement floor");
+}
+void save(juce::AudioProcessorEditor& e, const juce::File& file)
+{
+    const auto image = e.createComponentSnapshot(e.getLocalBounds());
+    auto out = file.createOutputStream(); check(out != nullptr, "Screenshot opens"); out->setPosition(0); out->truncate();
+    check(juce::PNGImageFormat().writeImageToStream(image, *out), "Screenshot renders");
+}
+void pluginTests(const juce::File& directory)
+{
+    auto storage = std::make_unique<SoundImagineProcessor>(); auto& p = *storage; p.prepareToPlay(48000, 257);
+    check(p.getLatencySamples() == 0, "Audio latency is zero");
+    juce::AudioBuffer<float> audio(2, 257); juce::MidiBuffer midi;
+    std::mt19937 rng(15); std::uniform_real_distribution<float> dist(-1, 1);
+    for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < audio.getNumSamples(); ++i) audio.setSample(ch, i, dist(rng));
+    const juce::AudioBuffer<float> copy(audio); p.processBlock(audio, midi);
+    for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < audio.getNumSamples(); ++i)
+        check(audio.getSample(ch, i) == copy.getSample(ch, i), "Stereo is bit-exact passthrough");
+    juce::AudioProcessor::BusesLayout mono; mono.inputBuses.add(juce::AudioChannelSet::mono()); mono.outputBuses.add(juce::AudioChannelSet::mono());
+    check(p.isBusesLayoutSupported(mono), "Mono buses supported"); mono.outputBuses.set(0, juce::AudioChannelSet::stereo());
+    check(!p.isBusesLayoutSupported(mono), "Mismatched buses rejected");
+    p.view.store(1); p.floorDb.store(-48); juce::MemoryBlock state; p.getStateInformation(state);
+    auto restoredStorage = std::make_unique<SoundImagineProcessor>(); auto& restored = *restoredStorage;
+    restored.setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+    check(restored.view.load() == 1 && restored.floorDb.load() == -48, "Settings survive session save/load");
+    const char invalid[] = "invalid"; restored.setStateInformation(invalid, sizeof(invalid));
+    check(restored.view.load() == 1 && restored.floorDb.load() == -48, "Malformed state is ignored");
+    p.prepareToPlay(96000, 257); check(p.readSnapshot().frames == 0 && p.readSnapshot().sampleRate == 96000, "Reprepare clears FIFO and sample rate");
+    p.prepareToPlay(48000, 257); p.view.store(0); p.floorDb.store(-72);
+    for (int block = 0; block < 130; ++block)
+    {
+        for (int i = 0; i < 257; ++i)
+        {
+            const double t = static_cast<double>(block * 257 + i) / 48000;
+            const float mid = static_cast<float>(0.25 * std::sin(juce::MathConstants<double>::twoPi * 80 * t) + 0.13 * std::sin(juce::MathConstants<double>::twoPi * 1000 * t));
+            const float side = static_cast<float>(0.20 * std::sin(juce::MathConstants<double>::twoPi * 4000 * t));
+            audio.setSample(0, i, mid + side + 0.04f * dist(rng));
+            audio.setSample(1, i, mid - side + 0.04f * dist(rng));
+        }
+        p.processBlock(audio, midi); juce::Thread::sleep(2);
+    }
+    for (int i = 0; i < 200 && p.readSnapshot().frames < 10; ++i) juce::Thread::sleep(5);
+    check(p.readSnapshot().frames >= 10 && p.dropped.load() == 0, "Worker analyzes continuous audio without loss");
+    std::unique_ptr<juce::AudioProcessorEditor> editor(p.createEditor());
+    directory.createDirectory();
+    for (const auto& size : { juce::Point<int>(900,640), juce::Point<int>(720,520), juce::Point<int>(1440,1000) })
+    {
+        editor->setSize(size.x, size.y); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
+        save(*editor, directory.getChildFile("3d-" + juce::String(size.x) + ".png"));
+    }
+    editor->setSize(900,640); p.view.store(1); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
+    save(*editor, directory.getChildFile("map.png"));
+    juce::TextButton* freezeButton = nullptr;
+    for (auto* child : editor->getChildren())
+        if (auto* button = dynamic_cast<juce::TextButton*>(child); button && button->getButtonText() == "Freeze") freezeButton = button;
+    check(freezeButton != nullptr, "Freeze control exists"); freezeButton->onClick();
+    const auto frozenImage = editor->createComponentSnapshot(editor->getLocalBounds());
+    juce::AudioBuffer<float> silence(2,257); silence.clear();
+    for (int block = 0; block < 80; ++block) { p.processBlock(silence,midi); juce::Thread::sleep(2); }
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
+    const auto heldImage = editor->createComponentSnapshot(editor->getLocalBounds());
+    for (int y = 100; y < 490; ++y) for (int x = 30; x < 860; ++x)
+        check(frozenImage.getPixelAt(x,y) == heldImage.getPixelAt(x,y), "Freeze holds measured plot while new audio is analyzed");
+    freezeButton->onClick(); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
+    for (auto* child : editor->getChildren())
+        if (auto* button = dynamic_cast<juce::TextButton*>(child); button && button->getButtonText() == "?") button->onClick();
+    editor->setSize(720,520); save(*editor, directory.getChildFile("help.png"));
+    editor.reset();
+    juce::AudioBuffer<float> huge(2,70000); huge.clear(); huge.setSample(0,69999,0.8f);
+    p.processBlock(huge,midi);
+    check(p.dropped.load() > 0 && huge.getSample(0,69999) == 0.8f, "Overload drops analysis samples without touching audio");
+    juce::Thread::sleep(50);
+    for (int block = 0; block < 80; ++block) { p.processBlock(audio,midi); juce::Thread::sleep(2); }
+    juce::Thread::sleep(50);
+    check(p.readSnapshot().frames > 0 && strongest(p.readSnapshot()).active, "Analysis resumes after FIFO overload");
+    p.releaseResources();
+    auto monoStorage = std::make_unique<SoundImagineProcessor>(); auto& monoProcessor = *monoStorage;
+    mono.inputBuses.set(0, juce::AudioChannelSet::mono()); mono.outputBuses.set(0, juce::AudioChannelSet::mono());
+    check(monoProcessor.setBusesLayout(mono), "Mono layout applies"); monoProcessor.prepareToPlay(44100, 33);
+    juce::AudioBuffer<float> monoAudio(1,33); monoAudio.clear(); monoAudio.setSample(0,2,0.7f); monoProcessor.processBlock(monoAudio,midi);
+    check(monoAudio.getSample(0,2) == 0.7f, "Mono is bit-exact passthrough");
+    monoProcessor.releaseResources();
+}
+void vstTests(const juce::String& path)
+{
+    juce::AudioPluginFormatManager formats;
+    auto format = std::make_unique<juce::VST3PluginFormat>();
+    juce::OwnedArray<juce::PluginDescription> types;
+    format->findAllTypesForFile(types, juce::File(path).getFullPathName());
+    check(types.size() == 1 && types[0]->name == "SoundImagine", "Built VST3 scans with the correct identity");
+    formats.addFormat(std::move(format)); juce::String error;
+    auto instance = formats.createPluginInstance(*types[0],48000,256,error);
+    if (!instance) std::cerr << error << '\n';
+    check(instance != nullptr, "Built VST3 loads in a plugin host");
+    instance->prepareToPlay(48000,256);
+    juce::AudioBuffer<float> audio(2,256); audio.clear(); audio.setSample(0,10,0.75f); audio.setSample(1,13,-0.2f);
+    juce::MidiBuffer midi; instance->processBlock(audio,midi);
+    check(audio.getSample(0,10) == 0.75f && audio.getSample(1,13) == -0.2f && audio.getSample(0,13) == 0,
+        "Actual VST3 wrapper passes stereo audio unchanged");
+    check(instance->getLatencySamples() == 0, "Actual VST3 reports zero latency");
+    juce::MemoryBlock state; instance->getStateInformation(state);
+    check(state.getSize() > 0, "Actual VST3 saves its state"); instance->setStateInformation(state.getData(),static_cast<int>(state.getSize()));
+    for (int i = 0; i < 2; ++i)
+    {
+        std::unique_ptr<juce::AudioProcessorEditor> editor(instance->createEditorAndMakeActive());
+        check(editor != nullptr, "Actual VST3 editor opens and reopens");
+        editor->setVisible(false); editor->addToDesktop(0);
+        juce::MessageManager::getInstance()->runDispatchLoopUntil(30);
+        check(editor->getPeer() != nullptr && editor->getWidth() >= 720 && editor->getHeight() >= 520,
+            "VST3 view attaches to a native host window with a valid size");
+    }
+    instance->releaseResources(); instance->prepareToPlay(44100,64); instance->releaseResources();
+}
+}
+int main(int argc, char** argv)
+{
+    juce::ScopedJuceInitialiser_GUI gui;
+    coreTests(); std::cout << "DSP signal checks passed." << std::endl;
+    pluginTests(juce::File(argc > 1 ? argv[1] : "verification"));
+    if (argc > 2) vstTests(argv[2]);
+    std::cout << "All analysis, passthrough, state, lifecycle, freeze, render and VST3 host checks passed.\n";
+}

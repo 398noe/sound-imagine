@@ -6,318 +6,258 @@ namespace
 {
 const juce::Colour background { 0xff11191f }, ink { 0xffedf3f4 }, muted { 0xff93a8b0 }, grid { 0xff2c3b43 };
 const juce::Colour mint { 0xff79d9bc }, coral { 0xffff8e80 }, amber { 0xffe1c68c };
-juce::String hz(float f) { return f >= 1000 ? juce::String(f / 1000, f < 10000 ? 1 : 0) + "k" : juce::String(juce::roundToInt(f)); }
-void text(juce::Graphics& g, const juce::String& s, juce::Rectangle<float> r, float size = 13, juce::Colour colour = muted,
-          juce::Justification align = juce::Justification::centredLeft)
+juce::String hz(float f) { return f>=1000 ? juce::String(f/1000,f<10000 ? 1 : 0)+"k" : juce::String(juce::roundToInt(f)); }
+void text(juce::Graphics& g,const juce::String& s,juce::Rectangle<float> r,float size=13,juce::Colour colour=muted,
+          juce::Justification align=juce::Justification::centredLeft)
 {
     const bool unicode=s.getNumBytesAsUTF8()>static_cast<size_t>(s.length());
     g.setColour(colour);
-    // Match CJK glyph height to the Latin UI; this face has taller line metrics.
     g.setFont(unicode ? juce::FontOptions("Yu Gothic UI",size*1.35f,juce::Font::plain) : juce::FontOptions(size));
     g.drawText(s,r,align);
 }
 juce::Colour bandColour(const imagine::Band& b)
 {
     if (!b.correlationValid) return muted;
-    return b.correlation >= 0 ? amber.interpolatedWith(mint, b.correlation) : amber.interpolatedWith(coral, -b.correlation);
+    return b.correlation>=0 ? amber.interpolatedWith(mint,b.correlation) : amber.interpolatedWith(coral,-b.correlation);
 }
 }
-juce::String SoundImagineEditor::tr(const char* en, const char* ja) const
+juce::String SoundImagineEditor::tr(const char* en,const char* ja) const
 {
-    return juce::String::fromUTF8(processor.language.load() == 1 ? ja : en);
+    return juce::String::fromUTF8(processor.language.load()==1 ? ja : en);
 }
-SoundImagineEditor::SoundImagineEditor(SoundImagineProcessor& p) : AudioProcessorEditor(&p), processor(p), camera(p.readCamera())
+SoundImagineEditor::SoundImagineEditor(SoundImagineProcessor& p) : AudioProcessorEditor(&p),processor(p),camera(p.readCamera())
 {
-    setOpaque(true); setResizable(true, true); setResizeLimits(720, 520, 1440, 1000);
-    for (auto* button : { &threeD, &map, &freeze, &help, &axisX, &axisY, &axisZ, &home })
+    setOpaque(true); setResizable(true,true); setResizeLimits(560,360,1440,1000);
+    // Old Map state has the same semantics as a Z alignment.
+    if (processor.view.exchange(0)==1) { camera=imagine::Camera::aligned(2); processor.saveCamera(camera); }
+    for (auto* button : {&axisX,&axisY,&axisZ,&home,&freeze,&settings,&help})
     {
         addAndMakeVisible(button);
-        button->setColour(juce::TextButton::buttonColourId, grid);
-        button->setColour(juce::TextButton::buttonOnColourId, mint.withAlpha(0.25f));
-        button->setColour(juce::TextButton::textColourOffId, ink);
-        button->setColour(juce::TextButton::textColourOnId, mint);
+        button->setColour(juce::TextButton::buttonColourId,grid);
+        button->setColour(juce::TextButton::buttonOnColourId,mint.withAlpha(0.25f));
+        button->setColour(juce::TextButton::textColourOffId,ink);
+        button->setColour(juce::TextButton::textColourOnId,mint);
     }
-    threeD.onClick = [this] { processor.view.store(0); repaint(); };
-    map.onClick = [this] { processor.view.store(1); repaint(); };
-    axisX.onClick = [this] { align(0); }; axisY.onClick = [this] { align(1); }; axisZ.onClick = [this] { align(2); };
-    home.onClick = [this] { camera=imagine::Camera::home(); alignedAxis=-1; processor.saveCamera(camera); processor.view.store(0); repaint(); };
-    freeze.onClick = [this] { frozen = !frozen; freeze.setToggleState(frozen, juce::dontSendNotification); repaint(); };
-    help.onClick = [this] { showHelp = !showHelp; repaint(); };
-    for (auto* combo : { &range, &languages })
-    {
-        addAndMakeVisible(combo);
-        combo->setColour(juce::ComboBox::backgroundColourId, grid); combo->setColour(juce::ComboBox::textColourId, ink);
-        combo->setColour(juce::ComboBox::outlineColourId, grid);
-    }
-    languages.addItem("English",1); languages.addItem(juce::String::fromUTF8("日本語"),2);
-    languages.onChange = [this] { processor.language.store(languages.getSelectedId()-1); updateLanguage(); repaint(); };
-    range.onChange = [this] { processor.floorDb.store(range.getSelectedId() == 1 ? -48 : range.getSelectedId() == 3 ? -90 : -72); repaint(); };
-    data = processor.readSnapshot(); timerCallback(); setSize(900, 700); startTimerHz(30);
+    axisX.onClick=[this] {align(0);}; axisY.onClick=[this] {align(1);}; axisZ.onClick=[this] {align(2);};
+    home.onClick=[this] {camera=imagine::Camera::home(); alignedAxis=-1; processor.saveCamera(camera); repaint();};
+    freeze.onClick=[this] {frozen=!frozen; freeze.setToggleState(frozen,juce::dontSendNotification); repaint();};
+    settings.onClick=[this] {showSettings();}; help.onClick=[this] {showHelp=!showHelp; repaint();};
+    data=processor.readSnapshot(); timerCallback(); setSize(760,540); startTimerHz(30);
 }
-SoundImagineEditor::~SoundImagineEditor() { stopTimer(); }
+SoundImagineEditor::~SoundImagineEditor() {stopTimer();}
 void SoundImagineEditor::updateLanguage()
 {
     lastLanguage=processor.language.load();
-    map.setButtonText(tr("Map","平面")); freeze.setButtonText(tr("Freeze","保持")); home.setButtonText(tr("Home","初期視点"));
-    range.clear(juce::dontSendNotification);
-    for (int i=0; i<3; ++i) range.addItem(tr("Floor ","下限 ")+juce::String(i==0 ? -48 : i==1 ? -72 : -90)+" dB",i+1);
-    range.setSelectedId(processor.floorDb.load()==-48 ? 1 : processor.floorDb.load()==-90 ? 3 : 2,juce::dontSendNotification);
-    languages.setSelectedId(lastLanguage+1,juce::dontSendNotification);
-    axisX.setTooltip(tr("Along X: Side versus RMS; frequency is hidden.","X軸方向：Sideとレベルの関係。周波数は重なります。"));
-    axisY.setTooltip(tr("Along Y: frequency versus RMS; Side is hidden.","Y軸方向：周波数とレベル。Sideの差は重なります。"));
-    axisZ.setTooltip(tr("Along Z: frequency versus Side; RMS is hidden.","Z軸方向：周波数とSide。レベルの差は重なります。"));
-    threeD.setTooltip(tr("Drag to rotate. Wheel to zoom. Double-click to reset.","ドラッグで自由回転・ホイールで拡大縮小・ダブルクリックで初期視点。"));
+    axisX.setTooltip(tr("Side vs level (frequency hidden)","Mid / Sideと強さ（周波数は重なる）"));
+    axisY.setTooltip(tr("Frequency vs level (Side hidden)","周波数と強さ（Sideは重なる）"));
+    axisZ.setTooltip(tr("Frequency vs Side (level hidden)","周波数とMid / Side（強さは重なる）"));
+    home.setTooltip(tr("Reset camera","視点をリセット")); freeze.setTooltip(tr("Freeze measurements","測定値の表示を保持"));
+    settings.setTooltip(tr("FFT / averaging / level / language","FFT・平均化・レベル表示・言語")); help.setTooltip(tr("Reading the graph","グラフの読み方"));
+}
+void SoundImagineEditor::showSettings()
+{
+    juce::PopupMenu menu,floors,fft,averaging,levels,languages;
+    const int floor=processor.floorDb.load();
+    for (int i=0;i<3;++i) {const int db=i==0 ? -48 : i==1 ? -72 : -90; floors.addItem(101+i,juce::String(db)+" dB",true,floor==db);}
+    for (int order=11;order<=15;++order)
+    {
+        const int n=1<<order;
+        fft.addItem(200+order,juce::String(n)+" / "+juce::String(n*1000.0/data.sampleRate,1)+" ms / "+juce::String(data.sampleRate/n,2)+" Hz",true,processor.fftOrderSetting.load()==order);
+    }
+    for (int i=0;i<3;++i) {const int ms=i==0 ? 50 : i==1 ? 250 : 1000; averaging.addItem(301+i,juce::String(ms)+" ms",true,processor.smoothingMs.load()==ms);}
+    levels.addItem(401,"RMS / dBFS",true,processor.levelMode.load()==0);
+    levels.addItem(402,"PSD / dBFS/Hz",true,processor.levelMode.load()==1);
+    languages.addItem(501,"English",true,processor.language.load()==0); languages.addItem(502,juce::String::fromUTF8("日本語"),true,processor.language.load()==1);
+    menu.addSubMenu(tr("Floor","表示下限"),floors); menu.addSubMenu(tr("FFT / window / bin spacing","FFT / 時間窓 / ビン間隔"),fft);
+    menu.addSubMenu(tr("Power averaging","パワーの平均化"),averaging); menu.addSubMenu(tr("Level","レベル表示"),levels); menu.addSubMenu(tr("Language","言語"),languages);
+    const juce::Component::SafePointer<SoundImagineEditor> safe(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&settings),[safe](int id)
+    {
+        if (!safe) return;
+        auto& p=safe->processor;
+        if (id>=101 && id<=103) p.floorDb.store(id==101 ? -48 : id==102 ? -72 : -90);
+        if (id>=211 && id<=215) p.fftOrderSetting.store(id-200);
+        if (id>=301 && id<=303) p.smoothingMs.store(id==301 ? 50 : id==302 ? 250 : 1000);
+        if (id==401 || id==402) p.levelMode.store(id-401);
+        if (id==501 || id==502) {p.language.store(id-501); safe->updateLanguage();}
+        safe->repaint();
+    });
 }
 void SoundImagineEditor::resized()
 {
-    const int x = getWidth() - 446;
-    threeD.setBounds(x,24,40,28); map.setBounds(x+44,24,48,28); range.setBounds(x+98,24,114,28);
-    freeze.setBounds(x+218,24,64,28); help.setBounds(x+288,24,28,28); languages.setBounds(x+322,24,98,28);
-    axisX.setBounds(148,99,36,26); axisY.setBounds(190,99,36,26); axisZ.setBounds(232,99,36,26); home.setBounds(276,99,88,26);
-    plot = { 64.f,180.f,static_cast<float>(getWidth()-128),static_cast<float>(getHeight()-350) };
+    const int x=getWidth()-264;
+    int i=0;
+    for (auto* button : {&axisX,&axisY,&axisZ,&home,&freeze,&settings,&help}) button->setBounds(x+i++*36,8,32,25);
+    plot={56.f,48.f,static_cast<float>(getWidth()-112),static_cast<float>(getHeight()-150)};
 }
 void SoundImagineEditor::timerCallback()
 {
-    if (!frozen)
-    {
-        data=processor.readSnapshot();
-        stale = data.frames == 0 || juce::Time::getMillisecondCounterHiRes()-data.capturedMs > 500;
-    }
+    if (!frozen) {data=processor.readSnapshot(); stale=data.frames==0 || juce::Time::getMillisecondCounterHiRes()-data.capturedMs>500;}
     if (lastLanguage!=processor.language.load()) updateLanguage();
-    camera=processor.readCamera();
-    alignedAxis=camera.alignedAxis();
-    threeD.setToggleState(processor.view.load()==0,juce::dontSendNotification);
-    map.setToggleState(processor.view.load()==1,juce::dontSendNotification);
-    axisX.setToggleState(processor.view.load()==0 && alignedAxis==0,juce::dontSendNotification);
-    axisY.setToggleState(processor.view.load()==0 && alignedAxis==1,juce::dontSendNotification);
-    axisZ.setToggleState(processor.view.load()==0 && alignedAxis==2,juce::dontSendNotification);
-    range.setSelectedId(processor.floorDb.load()==-48 ? 1 : processor.floorDb.load()==-90 ? 3 : 2,juce::dontSendNotification);
+    camera=processor.readCamera(); alignedAxis=camera.alignedAxis();
+    axisX.setToggleState(alignedAxis==0,juce::dontSendNotification); axisY.setToggleState(alignedAxis==1,juce::dontSendNotification); axisZ.setToggleState(alignedAxis==2,juce::dontSendNotification);
     repaint();
 }
 void SoundImagineEditor::align(int axis)
 {
-    camera=imagine::Camera::aligned(axis); alignedAxis=axis; processor.saveCamera(camera); processor.view.store(0); repaint();
+    camera=imagine::Camera::aligned(axis); alignedAxis=axis; processor.saveCamera(camera); repaint();
 }
-imagine::Vec3 SoundImagineEditor::world(float f, float side, float level) const
+float SoundImagineEditor::level(const imagine::Band& b) const
+{
+    return b.levelDb-(processor.levelMode.load()==1 ? 10*std::log10(b.high-b.low) : 0);
+}
+imagine::Vec3 SoundImagineEditor::world(float f,float side,float db) const
 {
     const float u=std::clamp(std::log(f/20)/std::log(data.bands.back().high/20),0.f,1.f);
     const float floor=static_cast<float>(processor.floorDb.load());
-    const float v=std::clamp((level-floor)/-floor,0.f,1.f);
-    return { (u-0.5f)*2, (side-0.5f)*1.4f, (v-0.5f)*1.4f };
+    return {(u-0.5f)*2,(side-0.5f)*1.4f,(std::clamp((db-floor)/-floor,0.f,1.f)-0.5f)*1.4f};
 }
 juce::Point<float> SoundImagineEditor::screen(imagine::Vec3 v) const
 {
-    const auto a=camera.transform({2,0,0}), b=camera.transform({0,1.4f,0}), c=camera.transform({0,0,1.4f});
-    const float extentX=std::abs(a.x)+std::abs(b.x)+std::abs(c.x), extentY=std::abs(a.y)+std::abs(b.y)+std::abs(c.y);
-    const float scale=0.82f*camera.zoom*std::min(plot.getWidth()/std::max(0.01f,extentX),plot.getHeight()/std::max(0.01f,extentY));
+    const auto a=camera.transform({2,0,0}),b=camera.transform({0,1.4f,0}),c=camera.transform({0,0,1.4f});
+    const float extentX=std::abs(a.x)+std::abs(b.x)+std::abs(c.x),extentY=std::abs(a.y)+std::abs(b.y)+std::abs(c.y);
     const auto q=camera.transform(v);
-    return { plot.getCentreX()+q.x*scale,plot.getCentreY()-q.y*scale };
+    // Normalize each projected span to the viewport: the axes have different units,
+    // so screen aspect is a display choice, not a physical distance metric.
+    return {plot.getCentreX()+q.x*plot.getWidth()*camera.zoom/std::max(0.01f,extentX),
+            plot.getCentreY()-q.y*plot.getHeight()*camera.zoom/std::max(0.01f,extentY)};
 }
-juce::Point<float> SoundImagineEditor::project(float f, float side, float level) const
-{
-    const auto v=world(f,side,level);
-    if (processor.view.load()==1) return { plot.getX()+(v.x/2+0.5f)*plot.getWidth(),plot.getBottom()-(v.y/1.4f+0.5f)*plot.getHeight() };
-    return screen(v);
-}
-juce::String SoundImagineEditor::viewGuide() const
-{
-    if (processor.view.load()==1 || alignedAxis==2)
-        return tr("Z view: Which bands contain more Side? Check coral points for mono loss.","Z方向：どの帯域にSideが多い？ 赤い点はモノラル時の減衰も確認。 ");
-    if (alignedAxis==0)
-        return tr("X view: Is strong energy concentrated in Mid or Side? Frequencies overlap.","X方向：強い音はMid寄り？ Side寄り？ 周波数の違いは重なって見えます。");
-    if (alignedAxis==1)
-        return tr("Y view: Which bands are strong? This is the RMS spectrum; Side is hidden.","Y方向：どの帯域が強い？ RMSスペクトルとして見る。Sideの違いは重なります。");
-    return tr("3D: Locate strong bands with high Side. Use X / Y / Z to separate the relationships.","3D：強くてSideの多い帯域を探す。X / Y / Zで関係を分けて確認。");
-}
+juce::Point<float> SoundImagineEditor::project(float f,float side,float db) const {return screen(world(f,side,db));}
 void SoundImagineEditor::drawPlot(juce::Graphics& g)
 {
-    const juce::Graphics::ScopedSaveState save(g);
-    g.reduceClipRegion(0,170,getWidth(),getHeight()-306);
-    const bool isMap=processor.view.load()==1;
-    const float floor=static_cast<float>(processor.floorDb.load()), upper=data.bands.back().high;
-    auto line=[&g](juce::Point<float> a,juce::Point<float> b,juce::Colour c,float width=1.f) { g.setColour(c); g.drawLine({a,b},width); };
+    const juce::Graphics::ScopedSaveState save(g); g.reduceClipRegion(0,0,getWidth(),getHeight()-75);
+    const float floor=static_cast<float>(processor.floorDb.load()),upper=data.bands.back().high;
+    auto line=[&g](juce::Point<float> a,juce::Point<float> b,juce::Colour c,float width=1.f) {g.setColour(c); g.drawLine({a,b},width);};
     const auto origin=project(20,0,floor);
-    // Grid planes establish the three data axes. Labels follow the camera.
-    for (float f : {20.f,100.f,1000.f,10000.f,upper})
+    const std::array<float,10> ticks {20,50,100,200,500,1000,2000,5000,10000,20000};
+    juce::Point<float> previous {-10000,-10000};
+    for (float f : ticks)
     {
-        const auto a=project(f,0,floor), b=project(f,1,floor);
-        line(a,b,grid);
-        if (!isMap) line(b,project(f,1,0),grid.withAlpha(0.55f));
-        if (isMap || alignedAxis!=0)
-            text(g,hz(f),{a.x-22,a.y+8,44,18},11,muted,juce::Justification::centred);
+        if (f>upper) continue;
+        const auto a=project(f,0,floor),b=project(f,1,floor);
+        line(a,b,grid); if (alignedAxis!=2) line(b,project(f,1,0),grid.withAlpha(0.5f));
+        if (alignedAxis!=0 && a.getDistanceFrom(previous)>32) {text(g,hz(f),{a.x-22,a.y+8,44,18},11,muted,juce::Justification::centred); previous=a;}
     }
-    for (float s : {0.f,0.5f,1.f})
+    if (upper<20000) {const auto a=project(upper,0,floor); text(g,hz(upper),{a.x-22,a.y+8,44,18},11,muted,juce::Justification::centred);}
+    for (float side : {0.f,0.25f,0.5f,0.75f,1.f})
     {
-        const auto a=project(20,s,floor), b=project(upper,s,floor);
-        line(a,b,grid);
-        if (isMap)
-            text(g,juce::String(juce::roundToInt(s*100))+"%",{a.x-44,a.y-9,38,18},11,muted,juce::Justification::centredRight);
-        else if (alignedAxis!=1 && s>0)
-            text(g,juce::String(juce::roundToInt(s*100))+"%",{a.x-22,a.y+8,44,18},11,muted,juce::Justification::centred);
-    }
-    if (!isMap)
-    {
-        for (float db : {floor,floor/2,0.f})
+        const auto a=project(20,side,floor),b=project(upper,side,floor); line(a,b,grid);
+        if (alignedAxis!=1)
         {
-            const auto a=project(20,0,db), b=project(upper,0,db);
-            line(a,b,grid.withAlpha(0.65f));
-            if (alignedAxis!=2) text(g,juce::String(juce::roundToInt(db)),{a.x-38,a.y-9,30,18},11,muted,juce::Justification::centredRight);
-        }
-        const std::array<juce::Point<float>,3> endpoints {project(upper,0,floor),project(20,1,floor),project(20,0,0)};
-        const std::array<juce::String,3> titles {tr("X: Frequency / Hz","X: 周波数 / Hz"),tr("Y: Side / %","Y: Side / %"),tr("Z: RMS / dBFS","Z: レベル / dBFS")};
-        for (int i=0;i<3;++i)
-        {
-            const auto endpoint=endpoints[static_cast<size_t>(i)];
-            if (origin.getDistanceFrom(endpoint)<2) continue;
-            g.setColour(i==0 ? mint : i==1 ? amber : coral);
-            g.drawArrow({origin,endpoint},1.5f,7,5);
-            auto delta=endpoint-origin; delta/=std::max(1.f,delta.getDistanceFromOrigin());
-            const auto label=endpoint+delta*(std::abs(delta.x)>0.5f ? 80.f : 24.f);
-            text(g,titles[static_cast<size_t>(i)],{label.x-69,label.y-9,138,18},11,ink,juce::Justification::centred);
+            const juce::String label=side==0 ? "Mid" : side==1 ? "Side" : side==0.5f ? "Mid = Side" : "";
+            if (label.isNotEmpty())
+            {
+                // X alignment makes Mid left and Side right; Z makes Mid bottom and Side top.
+                if (alignedAxis==0) text(g,label,{a.x-44,a.y+9,88,18},11,ink,juce::Justification::centred);
+                else text(g,label,{a.x-52,a.y-9,48,18},10,ink,juce::Justification::centredRight);
+            }
         }
     }
-    else
+    if (alignedAxis!=2)
     {
-        text(g,tr("X: Frequency / Hz","X: 周波数 / Hz"),{plot.getX(),plot.getBottom()+26,200,18},11);
-        text(g,"Y: Side / %",{plot.getRight()-100,plot.getY()-24,120,18},11);
+        const int step=plot.getHeight()>=260 ? 6 : 12;
+        for (int db=static_cast<int>(floor);db<=0;db+=step)
+        {
+            const auto a=project(20,0,static_cast<float>(db)),b=project(upper,0,static_cast<float>(db));
+            line(a,b,grid.withAlpha(db%12==0 ? 0.8f : 0.4f));
+            if (db%12==0 || plot.getHeight()>300) text(g,juce::String(db),{a.x-38,a.y-9,30,18},11,muted,juce::Justification::centredRight);
+        }
     }
-    struct Dot { int index; juce::Point<float> p; float depth; };
-    std::vector<Dot> dots;
+    const std::array<juce::Point<float>,3> ends {project(upper,0,floor),project(20,1,floor),project(20,0,0)};
+    for (int i=0;i<3;++i)
+    {
+        const auto endpoint=ends[static_cast<size_t>(i)]; if (origin.getDistanceFrom(endpoint)<2) continue;
+        g.setColour(i==0 ? mint : i==1 ? amber : coral); g.drawArrow({origin,endpoint},1.2f,7,5);
+    }
+    const auto zEnd=ends[2];
+    if (alignedAxis!=2) text(g,processor.levelMode.load()==0 ? "dBFS / RMS" : "dBFS/Hz / PSD",{zEnd.x-28,zEnd.y-26,125,18},11,ink);
+    // Far points first; no connecting trajectory between independent band measurements.
+    struct Dot {int index; juce::Point<float> p; float depth;}; std::vector<Dot> dots;
     for (int i=0;i<imagine::bandCount;++i)
     {
-        const auto& b=data.bands[static_cast<size_t>(i)];
-        if (!b.active || b.levelDb<floor) continue;
-        const float centre=std::sqrt(b.low*b.high);
-        const auto p=project(centre,b.side,b.levelDb);
-        const auto colour=bandColour(b);
-        if (!isMap && alignedAxis!=2) line(project(centre,b.side,floor),p,colour.withAlpha(0.17f));
-        dots.push_back({i,p,camera.transform(world(centre,b.side,b.levelDb)).z});
+        const auto& b=data.bands[static_cast<size_t>(i)]; const float db=level(b);
+        if (!b.active || db<floor) continue;
+        const float f=std::sqrt(b.low*b.high); const auto p=project(f,b.side,db);
+        if (alignedAxis!=2) line(project(f,b.side,floor),p,bandColour(b).withAlpha(0.15f));
+        dots.push_back({i,p,camera.transform(world(f,b.side,db)).z});
     }
-    // Draw far points first. Each point is a measured band, not an interpolated source trajectory.
-    std::sort(dots.begin(),dots.end(),[](const Dot& a,const Dot& b) { return a.depth<b.depth; });
+    std::sort(dots.begin(),dots.end(),[](const Dot& a,const Dot& b) {return a.depth<b.depth;});
     for (const auto& dot : dots)
     {
         const auto& b=data.bands[static_cast<size_t>(dot.index)];
-        const float radius=isMap || alignedAxis==2 ? 3+6*std::clamp((b.levelDb-floor)/-floor,0.f,1.f) : 4.f;
+        const float radius=alignedAxis==2 ? 3+5*std::clamp((level(b)-floor)/-floor,0.f,1.f) : 3.5f;
         g.setColour(bandColour(b)); g.fillEllipse(dot.p.x-radius,dot.p.y-radius,2*radius,2*radius);
-        if (dot.index==selected) { g.setColour(ink); g.drawEllipse(dot.p.x-radius-4,dot.p.y-radius-4,2*radius+8,2*radius+8,1.5f); }
+        if (dot.index==selected) {g.setColour(ink); g.drawEllipse(dot.p.x-radius-4,dot.p.y-radius-4,2*radius+8,2*radius+8,1.2f);}
     }
-    // Orientation triad remains visible even when a data axis points at the viewer.
-    if (!isMap)
+    const juce::Point<float> centre {static_cast<float>(getWidth()-26),static_cast<float>(getHeight()-107)};
+    const std::array<imagine::Vec3,3> axes {{{1,0,0},{0,1,0},{0,0,1}}}; const std::array<juce::String,3> names {"X","Y","Z"};
+    for (int i=0;i<3;++i)
     {
-        const juce::Point<float> centre {plot.getRight()-30,plot.getBottom()-18};
-        const std::array<imagine::Vec3,3> axes {{{1,0,0},{0,1,0},{0,0,1}}};
-        for (int i=0;i<3;++i)
-        {
-            const auto v=camera.transform(axes[static_cast<size_t>(i)]);
-            const auto p=centre+juce::Point<float>(v.x*28,-v.y*28);
-            line(centre,p,i==0 ? mint : i==1 ? amber : coral,2);
-            const std::array<juce::String,3> names {"X","Y","Z"};
-            text(g,names[static_cast<size_t>(i)],{p.x-7,p.y-9,14,18},11,ink,juce::Justification::centred);
-        }
+        const auto v=camera.transform(axes[static_cast<size_t>(i)]); const auto p=centre+juce::Point<float>(v.x*18,-v.y*18);
+        line(centre,p,i==0 ? mint : i==1 ? amber : coral,1.5f); text(g,names[static_cast<size_t>(i)],{p.x-6,p.y-8,12,16},10,ink,juce::Justification::centred);
     }
 }
 void SoundImagineEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(background);
-    text(g,"sound imagine",{26,22,230,34},25,ink);
-    text(g,tr("See the spectrum. Understand the stereo.","帯域の強さと、ステレオの関係を見る。"),{27,60,400,22},13);
-    text(g,tr("Align to axis","軸方向に整列"),{27,99,116,26},13,ink);
-    text(g,tr("Drag: rotate  /  Wheel: zoom","ドラッグ：回転 ／ ホイール：拡大縮小"),{382,99,static_cast<float>(getWidth()-409),26},12);
-    text(g,viewGuide(),{27,138,static_cast<float>(getWidth()-54),26},13,ink);
-    text(g,frozen ? tr("FROZEN","表示を保持中") : stale ? tr("NO RECENT AUDIO","入力更新なし") : tr("LIVE","測定中"),
-        {static_cast<float>(getWidth()-218),65,190,20},11,frozen ? amber : stale ? muted : mint,juce::Justification::centredRight);
-    drawPlot(g);
-    const float y=static_cast<float>(getHeight()-114);
-    g.setColour(grid); g.drawHorizontalLine(static_cast<int>(y-16),26,static_cast<float>(getWidth()-26));
-    const auto& b=data.bands[static_cast<size_t>(selected)];
-    text(g,hz(b.low)+" - "+hz(b.high)+" Hz",{27,y,210,26},20,ink);
-    const float column=static_cast<float>(getWidth()-270)/4;
-    const bool valid=b.active && data.frames>0;
-    const std::array<juce::String,4> labels {tr("BAND RMS","帯域レベル"),tr("SIDE ENERGY","Sideの割合"),tr("L/R CORRELATION","左右の相関"),tr("L/R BALANCE","左右の偏り")};
-    const std::array<juce::String,4> values {
-        valid ? juce::String(b.levelDb,1)+" dBFS" : "--",
-        valid ? juce::String(b.side*100,1)+"%" : "--",
+    g.fillAll(background); drawPlot(g);
+    const float y=static_cast<float>(getHeight()-67),col=static_cast<float>(getWidth()-24)/5;
+    g.setColour(grid); g.drawHorizontalLine(static_cast<int>(y-8),12,static_cast<float>(getWidth()-12));
+    const auto& b=data.bands[static_cast<size_t>(selected)]; const bool valid=b.active && data.frames>0;
+    const std::array<juce::String,5> labels {tr("Hz","帯域 / Hz"),processor.levelMode.load()==0 ? "RMS / dBFS" : "PSD / dBFS/Hz","Mid / Side %",tr("L/R correlation","左右相関"),tr("L/R balance","左右の偏り")};
+    const std::array<juce::String,5> values {hz(b.low)+" - "+hz(b.high),valid ? juce::String(level(b),1) : "--",
+        valid ? juce::String((1-b.side)*100,1)+" / "+juce::String(b.side*100,1) : "--",
         valid && b.correlationValid ? juce::String(b.correlation,2) : "--",
-        !valid ? "--" : std::abs(b.balance)<0.01f ? tr("Centre","中央") : juce::String(std::abs(b.balance)*100,0)+"% "+(b.balance<0 ? tr("L","左") : tr("R","右"))};
-    for (int i=0;i<4;++i)
-    {
-        const float x=250+static_cast<float>(i)*column;
-        text(g,labels[static_cast<size_t>(i)],{x,y,column,18},11);
-        text(g,values[static_cast<size_t>(i)],{x,y+22,column,24},17,i==2 ? bandColour(b) : ink);
-    }
-    text(g,tr("Hover over a point to inspect","点にマウスを合わせて詳細を見る"),{27,y+32,215,20},11);
-    const auto monoLabel=tr("Mono sum: ","モノラル和：");
-    const double monoDb=valid ? 10*std::log10(std::max(1.e-9f,1-b.side)) : 0;
-    const juce::String mono=!valid ? monoLabel+"--" : b.side>0.9999f ? monoLabel+tr("cancellation","ほぼ消失") : monoLabel+juce::String(std::abs(monoDb)<0.05 ? 0 : monoDb,1)+" dB";
-    text(g,mono,{27,y+55,230,20},11,amber);
-    text(g,tr("CORRELATION","左右の相関"),{250,y+59,90,20},10);
-    text(g,tr("-1 inverse","-1 逆相"),{346,y+59,95,20},11,coral);
-    text(g,tr("0 unrelated","0 相関なし"),{446,y+59,110,20},11,amber);
-    text(g,tr("+1 aligned","+1 同相"),{560,y+59,110,20},11,mint);
-    text(g,juce::String(data.sampleRate/1000,1)+" kHz / "+juce::String(data.sampleRate/imagine::fftSize,1)+tr(" Hz bins"," Hz分解能"),
-        {static_cast<float>(getWidth()-240),static_cast<float>(getHeight()-28),213,18},10,muted,juce::Justification::centredRight);
-    if (processor.dropped.load()!=0)
-        text(g,tr("Analysis overload: ","解析過負荷：")+juce::String(static_cast<juce::int64>(processor.dropped.load()))+tr(" samples skipped","サンプルをスキップ"),
-            {27,static_cast<float>(getHeight()-28),400,18},11,coral);
+        !valid ? "--" : std::abs(b.balance)<0.01f ? tr("Centre","中央") : juce::String(std::abs(b.balance)*100,1)+"% "+(b.balance<0 ? tr("L","左") : tr("R","右"))};
+    for (int i=0;i<5;++i) {const float x=12+i*col; text(g,labels[static_cast<size_t>(i)],{x,y,col,18},11); text(g,values[static_cast<size_t>(i)],{x,y+21,col,22},15,i==3 ? bandColour(b) : ink);}
+    text(g,juce::String(data.fftPoints*1000.0/data.sampleRate,1)+" ms / "+juce::String(data.sampleRate/data.fftPoints,2)+" Hz / "+juce::String(data.sampleRate/1000,1)+" kHz",
+        {12,static_cast<float>(getHeight()-20),300,16},10);
+    const juce::String state=frozen ? tr("Frozen","保持中") : stale ? tr("No recent audio","入力更新なし") : "";
+    text(g,state,{static_cast<float>(getWidth()-155),static_cast<float>(getHeight()-20),140,16},10,frozen ? amber : muted,juce::Justification::centredRight);
+    if (processor.dropped.load()!=0) text(g,tr("Analysis skipped: ","解析スキップ：")+juce::String(static_cast<juce::int64>(processor.dropped.load())),{315,static_cast<float>(getHeight()-20),180,16},10,coral);
     if (showHelp)
     {
-        juce::Rectangle<float> box {35,134,static_cast<float>(getWidth()-70),static_cast<float>(getHeight()-158)};
-        g.setColour(background.withAlpha(0.99f)); g.fillRoundedRectangle(box,10);
-        g.setColour(grid); g.drawRoundedRectangle(box,10,1); box=box.reduced(20);
-        text(g,tr("WHAT TO LOOK FOR","何を見るための点群か"),box.removeFromTop(30),20,ink);
-        const std::array<juce::String,10> lines {
-            tr("Each point is one frequency band. It is not the position of a sound source.","点は1つの周波数帯域。音源の空間位置を表すものではありません。"),
-            tr("X = frequency, Y = Side energy, Z = band RMS. Colour = L/R correlation.","X＝周波数、Y＝Sideの割合、Z＝帯域レベル。色＝左右の相関。"),
-            tr("Y view: Find strong / weak bands. Side differences overlap in this view.","Y方向：強い／弱い帯域を確認。Sideの違いはこの方向では重なります。"),
-            tr("Z view: Find bands with high Side. Dot size conveys the hidden RMS level.","Z方向：Sideの多い帯域を確認。隠れるレベルは点の大きさで補います。"),
-            tr("X view: Compare Side and strength. Different frequencies overlap; inspect a point.","X方向：Sideと強さの関係を見る。周波数は重なるので点の詳細も確認。"),
-            tr("Example: strong bass + high Side + coral colour? Check bass in mono.","例：強い低音がSide側にあり赤い？ モノラルで低音の減衰を確認。"),
-            tr("0% Side = identical L/R. 50% = equal Mid/Side. 100% = inverse L/R.","Side 0%＝左右同一、50%＝Mid/Side等パワー、100%＝左右逆相。"),
-            tr("One-sided audio also has 50% Side. Correlation --; check L/R balance.","片側だけの音もSide 50%。相関は --。左右の偏りと合わせて判断。"),
-            tr("Drag to rotate; wheel to zoom; double-click or Home to reset. Freeze holds data.","回転＝ドラッグ、拡大＝ホイール。初期視点で戻す。保持で固定。"),
-            tr("High correlation is not a quality score. Low bands share FFT resolution.","相関が高いほど良い、という採点ではありません。低域はFFT分解能を共有。")};
-        const float lineHeight=std::min(29.f,box.getHeight()/static_cast<float>(lines.size()));
-        for (const auto& s : lines) text(g,s,box.removeFromTop(lineHeight),13);
+        juce::Rectangle<float> box {20,42,static_cast<float>(getWidth()-40),static_cast<float>(getHeight()-120)};
+        g.setColour(background.withAlpha(0.99f)); g.fillRoundedRectangle(box,8); g.setColour(grid); g.drawRoundedRectangle(box,8,1); box=box.reduced(16);
+        text(g,tr("Reading the graph","グラフの読み方"),box.removeFromTop(27),18,ink);
+        const std::array<juce::String,9> lines {
+            tr("X: frequency. Y: Mid / Side power ratio. Z: RMS or PSD. Each dot is a band.","X＝周波数、Y＝Mid / Sideのパワー比、Z＝RMSかPSD。点は帯域の測定値。"),
+            tr("Y view: spectrum. Z view: stereo distribution. X view: Side versus strength.","Y方向＝スペクトル。Z方向＝ステレオの分布。X方向＝Sideと強さの関係。"),
+            tr("Mid end: L=R. Side end: L=-R. The middle means equal Mid and Side power.","Mid端＝左右同一、Side端＝左右逆相。中央＝MidとSideのパワーが同じ。"),
+            tr("The middle can mean unrelated stereo, one-sided audio, or 90-degree phase.","中央には無相関ステレオ、片側だけの音、90度の位相差などが含まれます。"),
+            tr("Colour: green +1, sand 0, coral -1 correlation. Grey: undefined correlation.","色：緑＝相関+1、砂色＝0、赤＝-1、灰色＝相関を定義できない状態。"),
+            tr("Coral + strong bass? Check mono loss. Side alone does not measure width.","強い低音が赤い？ モノラルでの減衰も確認。Sideだけで広がりは判定できません。"),
+            tr("RMS: integrated band power. PSD: average power per Hz; flat for white noise.","RMS＝帯域内のパワー。PSD＝1 Hzあたりの平均パワー。白色ノイズで水平。"),
+            tr("Longer FFT: finer bin spacing, slower response. Bin spacing = sample rate / N.","FFTを長くするとビンは細かく、反応は遅くなる。ビン間隔＝サンプルレート÷N。"),
+            tr("LUFS is programme loudness with K weighting, not a per-band RMS label.","LUFSはK重み付けによる全体の音量評価。帯域RMSの単位変更ではありません。")};
+        const float h=std::min(31.f,box.getHeight()/static_cast<float>(lines.size()));
+        for (const auto& s : lines) text(g,s,box.removeFromTop(h),getWidth()<680 ? 11.f : 13.f);
     }
 }
 void SoundImagineEditor::selectAt(juce::Point<float> p)
 {
-    if (!plot.expanded(30).contains(p)) return;
-    float nearest=24.f, bestDepth=-1.e9f;
+    if (!plot.expanded(25).contains(p)) return;
+    float nearest=24.f,bestDepth=-1.e9f;
     for (int i=0;i<imagine::bandCount;++i)
     {
-        const auto& b=data.bands[static_cast<size_t>(i)];
-        if (!b.active || b.levelDb<processor.floorDb.load()) continue;
-        const float centre=std::sqrt(b.low*b.high);
-        const float distance=p.getDistanceFrom(project(centre,b.side,b.levelDb));
-        const float depth=camera.transform(world(centre,b.side,b.levelDb)).z;
-        if (distance<nearest-0.5f || (std::abs(distance-nearest)<=0.5f && depth>bestDepth))
-        { nearest=distance; bestDepth=depth; selected=i; }
+        const auto& b=data.bands[static_cast<size_t>(i)]; const float db=level(b); if (!b.active || db<processor.floorDb.load()) continue;
+        const float f=std::sqrt(b.low*b.high),distance=p.getDistanceFrom(project(f,b.side,db)),depth=camera.transform(world(f,b.side,db)).z;
+        if (distance<nearest-0.5f || (std::abs(distance-nearest)<=0.5f && depth>bestDepth)) {nearest=distance; bestDepth=depth; selected=i;}
     }
     repaint();
 }
-void SoundImagineEditor::mouseMove(const juce::MouseEvent& e) { if (!showHelp) selectAt(e.position); }
+void SoundImagineEditor::mouseMove(const juce::MouseEvent& e) {if (!showHelp) selectAt(e.position);}
 void SoundImagineEditor::mouseDown(const juce::MouseEvent& e)
 {
-    dragging=!showHelp && processor.view.load()==0 && plot.contains(e.position);
-    dragStart=e.position; dragCamera=camera;
-    if (!showHelp) selectAt(e.position);
+    dragging=!showHelp && plot.contains(e.position); dragStart=e.position; dragCamera=camera; if (!showHelp) selectAt(e.position);
 }
 void SoundImagineEditor::mouseDrag(const juce::MouseEvent& e)
 {
-    if (!dragging) return;
-    const float radius=std::min(plot.getWidth(),plot.getHeight())*0.5f;
-    const auto from=(dragStart-plot.getCentre())/radius, to=(e.position-plot.getCentre())/radius;
-    camera=dragCamera; camera.orbit(from.x,-from.y,to.x,-to.y);
-    alignedAxis=-1; processor.saveCamera(camera); repaint();
+    if (!dragging) return; const float radius=std::min(plot.getWidth(),plot.getHeight())*0.5f;
+    const auto from=(dragStart-plot.getCentre())/radius,to=(e.position-plot.getCentre())/radius;
+    camera=dragCamera; camera.orbit(from.x,-from.y,to.x,-to.y); alignedAxis=-1; processor.saveCamera(camera); repaint();
 }
 void SoundImagineEditor::mouseWheelMove(const juce::MouseEvent& e,const juce::MouseWheelDetails& wheel)
 {
-    if (showHelp || processor.view.load()!=0 || !plot.contains(e.position)) return;
-    camera.zoom=std::clamp(camera.zoom*std::exp(wheel.deltaY),0.5f,2.5f); processor.saveCamera(camera); repaint();
+    if (showHelp || !plot.contains(e.position)) return; camera.zoom=std::clamp(camera.zoom*std::exp(wheel.deltaY),0.5f,2.5f); processor.saveCamera(camera); repaint();
 }
-void SoundImagineEditor::mouseDoubleClick(const juce::MouseEvent& e)
-{
-    if (!showHelp && plot.contains(e.position) && processor.view.load()==0) home.onClick();
-}
+void SoundImagineEditor::mouseDoubleClick(const juce::MouseEvent& e) {if (!showHelp && plot.contains(e.position)) home.onClick();}

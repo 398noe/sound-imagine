@@ -2,6 +2,15 @@
 #include "PluginProcessor.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
+class OverlayButton final : public juce::TextButton
+{
+public:
+    explicit OverlayButton(const juce::String& label) : juce::TextButton(label) {setAlpha(0.4f);}
+    void mouseEnter(const juce::MouseEvent& e) override {juce::TextButton::mouseEnter(e); setAlpha(1);}
+    void mouseExit(const juce::MouseEvent& e) override {juce::TextButton::mouseExit(e); setAlpha(hasKeyboardFocus(true) ? 1.f : 0.4f);}
+    void focusGained(juce::Component::FocusChangeType cause) override {juce::TextButton::focusGained(cause); setAlpha(1);}
+    void focusLost(juce::Component::FocusChangeType cause) override {juce::TextButton::focusLost(cause); setAlpha(isMouseOver() ? 1.f : 0.4f);}
+};
 class SoundImagineEditor final : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
@@ -20,16 +29,16 @@ private:
     void drawPlot(juce::Graphics&);
     void selectAt(juce::Point<float>);
     void align(int axis);
+    void showSettings();
     void updateLanguage();
     juce::String tr(const char* en, const char* ja) const;
-    juce::String viewGuide() const;
+    float level(const imagine::Band&) const;
     imagine::Vec3 world(float frequency, float side, float level) const;
     juce::Point<float> screen(imagine::Vec3) const;
     SoundImagineProcessor& processor;
     imagine::Snapshot data;
-    juce::TextButton threeD { "3D" }, map { "Map" }, freeze { "Freeze" }, help { "?" };
-    juce::TextButton axisX { "X" }, axisY { "Y" }, axisZ { "Z" }, home { "Home" };
-    juce::ComboBox range, languages;
+    OverlayButton axisX { "X" }, axisY { "Y" }, axisZ { "Z" }, home { "R" }, freeze { "||" }, settings { "..." }, help { "?" };
+    juce::TooltipWindow tooltips { this,650 };
     imagine::Camera camera, dragCamera;
     juce::Point<float> dragStart;
     int alignedAxis = -1, lastLanguage = -1;

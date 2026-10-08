@@ -31,6 +31,7 @@ public:
     imagine::Camera readCamera();
     void saveCamera(imagine::Camera);
     std::atomic<int> view { 0 }, floorDb { -72 }, language { 1 };
+    std::atomic<int> fftOrderSetting { imagine::fftOrder }, smoothingMs { 250 }, levelMode { 0 };
     std::atomic<std::uint64_t> dropped { 0 };
 private:
     void run() override;

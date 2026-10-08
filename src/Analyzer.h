@@ -1,6 +1,8 @@
 #pragma once
 #include <juce_dsp/juce_dsp.h>
 #include <array>
+#include <memory>
+#include <vector>
 
 namespace imagine
 {
@@ -16,19 +18,21 @@ struct Snapshot
     double sampleRate = 48000;
     std::uint64_t frames = 0;
     double capturedMs = 0;
+    int fftPoints = fftSize;
+    int averagingMs = 250;
 };
 class Analyzer
 {
 public:
     Analyzer();
-    void reset(double sampleRate);
+    void reset(double sampleRate, int order = fftOrder, int smoothingMs = 250);
     bool push(float left, float right);
     const Snapshot& snapshot() const noexcept { return result; }
 private:
     void analyse();
-    juce::dsp::FFT fft { fftOrder };
-    std::array<float, fftSize> window {}, ringL {}, ringR {};
-    std::array<float, 2 * fftSize> spectrumL {}, spectrumR {};
+    std::unique_ptr<juce::dsp::FFT> fft;
+    std::vector<float> window, ringL, ringR, spectrumL, spectrumR;
+    int size = fftSize, step = hopSize, currentOrder = 0;
     struct Power { double left = 0, right = 0, cross = 0; };
     std::array<Power, bandCount> powers {};
     Snapshot result;

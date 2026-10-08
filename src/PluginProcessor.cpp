@@ -7,7 +7,7 @@ SoundImagineProcessor::SoundImagineProcessor()
 SoundImagineProcessor::~SoundImagineProcessor() { stopThread(-1); }
 void SoundImagineProcessor::prepareToPlay(double sr, int)
 {
-    stopThread(-1); fifo.reset(); dropped.store(0); analyzer.reset(sr);
+    stopThread(-1); fifo.reset(); dropped.store(0); analyzer.reset(sr,fftOrderSetting.load(),smoothingMs.load());
     { std::lock_guard lock(snapshotMutex); published = analyzer.snapshot(); }
     setLatencySamples(0); startThread();
 }
@@ -35,12 +35,15 @@ void SoundImagineProcessor::run()
 {
     juce::ScopedNoDenormals guard;
     std::uint64_t previousDrops = 0;
+    int order=static_cast<int>(std::log2(analyzer.snapshot().fftPoints)), smoothing=analyzer.snapshot().averagingMs;
     while (!threadShouldExit())
     {
         const auto losses = dropped.load();
-        if (losses != previousDrops)
+        const int nextOrder=fftOrderSetting.load(), nextSmoothing=smoothingMs.load();
+        if (losses != previousDrops || nextOrder!=order || nextSmoothing!=smoothing)
         {
-            fifo.finishedRead(fifo.getNumReady()); analyzer.reset(analyzer.snapshot().sampleRate); previousDrops = losses;
+            order=nextOrder; smoothing=nextSmoothing;
+            fifo.finishedRead(fifo.getNumReady()); analyzer.reset(analyzer.snapshot().sampleRate,order,smoothing); previousDrops = losses;
             std::lock_guard lock(snapshotMutex); published = analyzer.snapshot();
         }
         int start1, size1, start2, size2;
@@ -65,6 +68,7 @@ void SoundImagineProcessor::getStateInformation(juce::MemoryBlock& data)
 {
     juce::XmlElement xml("SoundImagine"); xml.setAttribute("version", 2);
     xml.setAttribute("view", view.load()); xml.setAttribute("floor", floorDb.load()); xml.setAttribute("language",language.load());
+    xml.setAttribute("fftOrder",fftOrderSetting.load()); xml.setAttribute("smoothing",smoothingMs.load()); xml.setAttribute("levelMode",levelMode.load());
     const auto c=readCamera();
     xml.setAttribute("qw",c.w); xml.setAttribute("qx",c.x); xml.setAttribute("qy",c.y); xml.setAttribute("qz",c.z); xml.setAttribute("zoom",c.zoom);
     copyXmlToBinary(xml, data);
@@ -78,10 +82,15 @@ void SoundImagineProcessor::setStateInformation(const void* data, int size)
         const int floor = xml->getIntAttribute("floor", -72);
         floorDb.store(floor == -48 || floor == -90 ? floor : -72);
         language.store(juce::jlimit(0,1,xml->getIntAttribute("language",1)));
+        fftOrderSetting.store(juce::jlimit(11,15,xml->getIntAttribute("fftOrder",13)));
+        smoothingMs.store(juce::jlimit(50,1000,xml->getIntAttribute("smoothing",250)));
+        levelMode.store(juce::jlimit(0,1,xml->getIntAttribute("levelMode",0)));
         auto c=imagine::Camera::home();
         c.w=static_cast<float>(xml->getDoubleAttribute("qw",c.w)); c.x=static_cast<float>(xml->getDoubleAttribute("qx",c.x));
         c.y=static_cast<float>(xml->getDoubleAttribute("qy",c.y)); c.z=static_cast<float>(xml->getDoubleAttribute("qz",c.z));
-        c.zoom=static_cast<float>(xml->getDoubleAttribute("zoom",1)); saveCamera(c);
+        c.zoom=static_cast<float>(xml->getDoubleAttribute("zoom",1));
+        if (view.load()==1) { c=imagine::Camera::aligned(2); view.store(0); }
+        saveCamera(c);
     }
 }
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new SoundImagineProcessor(); }

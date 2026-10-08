@@ -35,6 +35,20 @@ imagine::Snapshot tone(double sr, float gainR, double phase = 0, double frequenc
 }
 void coreTests()
 {
+    for (int order=11;order<=15;++order)
+    {
+        imagine::Analyzer configurable; configurable.reset(48000,order,50);
+        const int n=1<<order;
+        for (int i=0;i<n*3;++i)
+        {
+            const float sample=static_cast<float>(0.5*std::sin(juce::MathConstants<double>::twoPi*1000*i/48000));
+            configurable.push(sample,sample);
+        }
+        check(configurable.snapshot().fftPoints==n && configurable.snapshot().frames==9,"Every FFT size uses its complete window and 75% overlap");
+        check(std::abs(10*std::log10(totalPower(configurable.snapshot()))+9.0309)<0.02,"All selectable FFT sizes preserve calibrated RMS power");
+        configurable.reset(96000,order,1000);
+        check(configurable.snapshot().frames==0 && configurable.snapshot().fftPoints==n,"FFT reconfiguration clears measurement history");
+    }
     for (int axis=0;axis<3;++axis)
     {
         const auto c=imagine::Camera::aligned(axis);
@@ -74,6 +88,12 @@ void coreTests()
     double side = 0, corr = 0;
     for (const auto& b : noise.snapshot().bands) { side += b.side; corr += b.correlation; }
     check(std::abs(side / imagine::bandCount - 0.5) < 0.03 && std::abs(corr / imagine::bandCount) < 0.06, "Independent noise approaches 50% Side and zero correlation");
+    for (int i=18;i<imagine::bandCount;++i)
+    {
+        const auto& b=noise.snapshot().bands[static_cast<size_t>(i)];
+        const double psd=b.levelDb-10*std::log10(b.high-b.low);
+        check(std::abs(psd-10*std::log10(2*0.25*0.25/3/48000))<1.5,"White-noise PSD is calibrated and flat across logarithmic band widths");
+    }
     noise.reset(48000);
     for (int i = 0; i < imagine::fftSize; ++i) noise.push(0, 0);
     check(noise.snapshot().frames == 1, "First frame waits for a complete FFT window");
@@ -106,16 +126,21 @@ void pluginTests(const juce::File& directory)
     check(p.isBusesLayoutSupported(mono), "Mono buses supported"); mono.outputBuses.set(0, juce::AudioChannelSet::stereo());
     check(!p.isBusesLayoutSupported(mono), "Mismatched buses rejected");
     check(p.language.load()==1,"Japanese is the initial language");
-    p.view.store(1); p.floorDb.store(-48); p.language.store(0);
+    p.view.store(0); p.floorDb.store(-48); p.language.store(0);
+    p.fftOrderSetting.store(12); p.smoothingMs.store(50); p.levelMode.store(1);
     auto savedCamera=imagine::Camera::aligned(0); savedCamera.zoom=1.4f; p.saveCamera(savedCamera);
     juce::MemoryBlock state; p.getStateInformation(state);
     auto restoredStorage = std::make_unique<SoundImagineProcessor>(); auto& restored = *restoredStorage;
     restored.setStateInformation(state.getData(), static_cast<int>(state.getSize()));
-    check(restored.view.load() == 1 && restored.floorDb.load() == -48, "Settings survive session save/load");
+    check(restored.view.load() == 0 && restored.floorDb.load() == -48, "Settings survive session save/load");
+    check(restored.fftOrderSetting.load()==12 && restored.smoothingMs.load()==50 && restored.levelMode.load()==1,"Analysis settings survive session save/load");
     check(restored.language.load()==0 && restored.readCamera().alignedAxis()==0 && std::abs(restored.readCamera().zoom-1.4f)<0.001f,
         "Language, orientation and zoom survive session save/load");
     const char invalid[] = "invalid"; restored.setStateInformation(invalid, sizeof(invalid));
-    check(restored.view.load() == 1 && restored.floorDb.load() == -48, "Malformed state is ignored");
+    check(restored.view.load() == 0 && restored.floorDb.load() == -48, "Malformed state is ignored");
+    p.view.store(1); p.getStateInformation(state); restored.setStateInformation(state.getData(),static_cast<int>(state.getSize()));
+    check(restored.view.load()==0 && restored.readCamera().alignedAxis()==2,"Legacy Map state migrates to Z alignment");
+    p.view.store(0); p.fftOrderSetting.store(13); p.smoothingMs.store(250); p.levelMode.store(0);
     p.prepareToPlay(96000, 257); check(p.readSnapshot().frames == 0 && p.readSnapshot().sampleRate == 96000, "Reprepare clears FIFO and sample rate");
     p.prepareToPlay(48000, 257); p.view.store(0); p.floorDb.store(-72); p.saveCamera(imagine::Camera::home());
     for (int block = 0; block < 130; ++block)
@@ -134,11 +159,18 @@ void pluginTests(const juce::File& directory)
     check(p.readSnapshot().frames >= 10 && p.dropped.load() == 0, "Worker analyzes continuous audio without loss");
     std::unique_ptr<juce::AudioProcessorEditor> editor(p.createEditor());
     directory.createDirectory();
-    for (const auto& size : { juce::Point<int>(900,640), juce::Point<int>(720,520), juce::Point<int>(1440,1000) })
+    for (const auto& size : { juce::Point<int>(900,640), juce::Point<int>(720,520), juce::Point<int>(560,360), juce::Point<int>(1440,1000) })
     {
         editor->setSize(size.x, size.y); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
         save(*editor, directory.getChildFile("3d-" + juce::String(size.x) + ".png"));
     }
+    for (const auto& size : {juce::Point<int>(720,520),juce::Point<int>(560,360)})
+    {
+        editor->setSize(size.x,size.y); p.saveCamera(imagine::Camera::aligned(1));
+        juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
+        save(*editor,directory.getChildFile("spectrum-"+juce::String(size.x)+".png"));
+    }
+    p.saveCamera(imagine::Camera::home()); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
     editor->setSize(900,700);
     auto* interactive=dynamic_cast<SoundImagineEditor*>(editor.get());
     check(interactive!=nullptr,"Interactive editor is available");
@@ -148,6 +180,13 @@ void pluginTests(const juce::File& directory)
             juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier),1,0,0,0,0,editor.get(),editor.get(),
             juce::Time::getCurrentTime(),{450,340},juce::Time::getCurrentTime(),1,true);
     };
+    for (auto* child : editor->getChildren())
+        if (auto* button=dynamic_cast<OverlayButton*>(child); button && button->getButtonText()=="X")
+        {
+            check(std::abs(button->getAlpha()-0.4f)<0.001f,"Axis controls start translucent");
+            button->mouseEnter(makeMouse({10,10})); check(button->getAlpha()==1,"Axis controls become opaque on hover");
+            button->mouseExit(makeMouse({10,10})); check(std::abs(button->getAlpha()-0.4f)<0.001f,"Axis controls fade after hover");
+        }
     interactive->mouseDown(makeMouse({450,340})); interactive->mouseDrag(makeMouse({510,370}));
     check(std::abs(p.readCamera().x-imagine::Camera::home().x)>0.01f,"Dragging the plot rotates the actual editor camera");
     juce::MouseWheelDetails wheel {}; wheel.deltaY=0.3f;
@@ -170,24 +209,21 @@ void pluginTests(const juce::File& directory)
     juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
     save(*editor,directory.getChildFile("3d-ja.png"));
     for (auto* child : editor->getChildren())
-        if (auto* combo=dynamic_cast<juce::ComboBox*>(child); combo && combo->getNumItems()==2)
-        {
-            combo->setSelectedId(1,juce::sendNotificationSync);
-            check(p.language.load()==0,"Language selector switches to English");
-            combo->setSelectedId(2,juce::sendNotificationSync);
-            check(p.language.load()==1,"Language selector switches to Japanese");
-        }
+        if (auto* button=dynamic_cast<juce::TextButton*>(child))
+            check(button->getButtonText()!="3D" && button->getButtonText()!="Map","Redundant view switches are removed");
     for (auto* child : editor->getChildren())
         if (auto* button=dynamic_cast<juce::TextButton*>(child); button && button->getButtonText()=="?") button->onClick();
     editor->setSize(720,520); save(*editor,directory.getChildFile("help-ja.png"));
     for (auto* child : editor->getChildren())
         if (auto* button=dynamic_cast<juce::TextButton*>(child); button && button->getButtonText()=="?") button->onClick();
     p.language.store(0); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
-    editor->setSize(900,640); p.view.store(1); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
-    save(*editor, directory.getChildFile("map.png"));
+    editor->setSize(900,640); p.saveCamera(imagine::Camera::aligned(2)); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
+    save(*editor, directory.getChildFile("z-view.png"));
+    p.levelMode.store(1); juce::MessageManager::getInstance()->runDispatchLoopUntil(40);
+    save(*editor,directory.getChildFile("psd.png")); p.levelMode.store(0);
     juce::TextButton* freezeButton = nullptr;
     for (auto* child : editor->getChildren())
-        if (auto* button = dynamic_cast<juce::TextButton*>(child); button && button->getButtonText() == "Freeze") freezeButton = button;
+        if (auto* button = dynamic_cast<juce::TextButton*>(child); button && button->getButtonText() == "||") freezeButton = button;
     check(freezeButton != nullptr, "Freeze control exists"); freezeButton->onClick();
     const auto frozenImage = editor->createComponentSnapshot(editor->getLocalBounds());
     juce::AudioBuffer<float> silence(2,257); silence.clear();
@@ -208,6 +244,13 @@ void pluginTests(const juce::File& directory)
     for (int block = 0; block < 80; ++block) { p.processBlock(audio,midi); juce::Thread::sleep(2); }
     juce::Thread::sleep(50);
     check(p.readSnapshot().frames > 0 && strongest(p.readSnapshot()).active, "Analysis resumes after FIFO overload");
+    for (const int order : {11,15})
+    {
+        p.fftOrderSetting.store(order); p.smoothingMs.store(50); juce::Thread::sleep(30);
+        for (int block=0;block<180;++block) {p.processBlock(audio,midi); juce::Thread::sleep(2);}
+        juce::Thread::sleep(30);
+        check(p.readSnapshot().fftPoints==(1<<order) && p.readSnapshot().frames>0,"Worker applies FFT size changes during playback and resumes analysis");
+    }
     p.releaseResources();
     auto monoStorage = std::make_unique<SoundImagineProcessor>(); auto& monoProcessor = *monoStorage;
     mono.inputBuses.set(0, juce::AudioChannelSet::mono()); mono.outputBuses.set(0, juce::AudioChannelSet::mono());

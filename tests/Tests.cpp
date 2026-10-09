@@ -221,10 +221,11 @@ void pluginTests(const juce::File& directory)
     editor->setSize(900,700);
     auto* interactive=dynamic_cast<SoundImagineEditor*>(editor.get());
     check(interactive!=nullptr,"Interactive editor is available");
-    const auto makeMouse=[&](juce::Point<float> position,bool shift=false)
+    const auto makeMouse=[&](juce::Point<float> position,bool rightButton=false)
     {
+        const auto buttonModifier=rightButton ? juce::ModifierKeys::rightButtonModifier : juce::ModifierKeys::leftButtonModifier;
         return juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(),position,
-            juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | (shift ? juce::ModifierKeys::shiftModifier : 0)),1,0,0,0,0,editor.get(),editor.get(),
+            juce::ModifierKeys(buttonModifier),1,0,0,0,0,editor.get(),editor.get(),
             juce::Time::getCurrentTime(),{450,340},juce::Time::getCurrentTime(),1,true);
     };
     const auto sameOrientation=[](const imagine::Camera& a,const imagine::Camera& b)
@@ -259,8 +260,8 @@ void pluginTests(const juce::File& directory)
     interactive->mouseDown(makeMouse({450,340},true)); interactive->mouseDrag(makeMouse({490,365},true));
     const auto afterPan=p.readCamera();
     check(afterPan.x==beforePan.x && afterPan.y==beforePan.y && afterPan.z==beforePan.z && afterPan.w==beforePan.w && afterPan.zoom==beforePan.zoom,
-        "Shift-drag preserves rotation and zoom");
-    check(afterPan.panX>beforePan.panX && afterPan.panY>beforePan.panY,"Shift-drag pans the graph in the drag direction");
+        "Right-drag preserves rotation and zoom");
+    check(afterPan.panX>beforePan.panX && afterPan.panY>beforePan.panY,"Right-drag pans the graph in the drag direction");
     save(*editor,directory.getChildFile("panned.png"));
     interactive->mouseDoubleClick(makeMouse({450,340}));
     check(std::abs(p.readCamera().zoom-1)<0.001f && std::abs(p.readCamera().x-imagine::Camera::home().x)<0.001f,

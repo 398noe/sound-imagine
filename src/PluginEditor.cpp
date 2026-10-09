@@ -150,7 +150,7 @@ void SoundImagineEditor::updateLanguage()
     axisY.setTooltip(tr("Frequency vs level (Side hidden)","周波数と強さ（Sideは重なる）"));
     axisZ.setTooltip(tr("Frequency vs Side (level hidden)","周波数とMid / Side（強さは重なる）"));
     quadButton.setTooltip(tr("Switch single / four views: free / X / Y / Z", "1画面 / 4分割を切り替え：自由視点 / X / Y / Z"));
-    setTooltip(tr("Drag to rotate; Shift-drag to pan; wheel to zoom", "ドラッグで回転、Shift＋ドラッグで平行移動、ホイールで拡大縮小"));
+    setTooltip(tr("Left-drag to rotate; right-drag to pan; wheel to zoom", "左ドラッグで回転、右ドラッグで平行移動、ホイールで拡大縮小"));
     home.setTooltip(tr("Reset camera","視点をリセット")); freeze.setTooltip(tr("Freeze measurements","測定値の表示を保持"));
     settings.setTooltip(tr("FFT / averaging / level / language","FFT・平均化・レベル表示・言語")); help.setTooltip(tr("Reading the graph","グラフの読み方"));
     tableButton.setTooltip(tr("Show all bands in a separate window","全帯域の測定値を別ウィンドウで表示"));
@@ -414,12 +414,14 @@ void SoundImagineEditor::selectAt(juce::Point<float> p)
 void SoundImagineEditor::mouseMove(const juce::MouseEvent& e) {if (!showHelp) selectAt(e.position);}
 void SoundImagineEditor::mouseDown(const juce::MouseEvent& e)
 {
-    dragging=!showHelp && plot.contains(e.position); dragStart=e.position; dragCamera=camera; if (!showHelp) selectAt(e.position);
+    dragging=!showHelp && plot.contains(e.position) && (e.mods.isLeftButtonDown() || e.mods.isRightButtonDown());
+    dragStart=e.position; dragCamera=camera;
+    if (!showHelp && e.mods.isLeftButtonDown()) selectAt(e.position);
 }
 void SoundImagineEditor::mouseDrag(const juce::MouseEvent& e)
 {
     if (!dragging) return;
-    if (e.mods.isShiftDown())
+    if (e.mods.isRightButtonDown())
     {
         camera=dragCamera;
         camera.panX+=(e.position.x-dragStart.x)/plot.getWidth();
